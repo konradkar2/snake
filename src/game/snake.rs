@@ -1,5 +1,5 @@
-
-use macroquad::prelude::*;
+use crate::config::{SCREEN_HEIGHT, SCREEN_WIDTH};
+use macroquad::prelude::{Color, Vec2, draw_rectangle, vec2};
 
 pub(crate) enum Direction {
     Up,
@@ -14,11 +14,12 @@ pub(crate) struct Snake {
     direction: Direction,
     size: f32,
     speed: f32,
+    color: Color,
 }
 
 impl Snake {
-    pub(crate) fn new(size: f32, speed: f32) -> Self {
-        let last_tail_pos = vec2(screen_width() / 2.0, screen_height() / 2.0);
+    pub(crate) fn new(size: f32, speed: f32, color: Color) -> Self {
+        let last_tail_pos = vec2(SCREEN_WIDTH / 2.0, SCREEN_HEIGHT / 2.0);
 
         let mut ret = Self {
             direction: Direction::Left,
@@ -26,6 +27,7 @@ impl Snake {
             positions: Vec::from([last_tail_pos]),
             size: size,
             speed: speed,
+            color: color,
         };
 
         ret.move_step();
@@ -40,7 +42,7 @@ impl Snake {
 
         if self.positions.len() > 1 {
             for i in (1..self.positions.len()).rev() {
-                self.positions[i] = self.positions[i-1];
+                self.positions[i] = self.positions[i - 1];
             }
         }
 
@@ -53,16 +55,16 @@ impl Snake {
             Direction::Right => head_pos.x += self.speed,
         }
 
-        if head_pos.x > screen_width() {
+        if head_pos.x > SCREEN_WIDTH {
             head_pos.x = 0.0;
         } else if head_pos.x < 0.0 {
-            head_pos.x = screen_width();
+            head_pos.x = SCREEN_WIDTH;
         }
 
-        if head_pos.y > screen_height() {
+        if head_pos.y > SCREEN_HEIGHT {
             head_pos.y = 0.0;
         } else if head_pos.y < 0.0 {
-            head_pos.y = screen_height();
+            head_pos.y = SCREEN_HEIGHT;
         }
     }
 
@@ -72,7 +74,7 @@ impl Snake {
 
     pub(crate) fn draw(&self) {
         for pos in &self.positions {
-            draw_rectangle(pos.x, pos.y, self.size, self.size, GREEN);
+            draw_rectangle(pos.x, pos.y, self.size, self.size, self.color);
         }
     }
 
@@ -109,5 +111,3 @@ impl Snake {
         false
     }
 }
-
-
