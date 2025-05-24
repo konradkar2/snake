@@ -7,6 +7,5 @@ pub const SNAKE_UPDATE_STEP: u64 = FPS / SNAKE_UPDATE_FREQ;
 pub const SNAKE_SIZE: f32 = 20.0;
 pub const SNAKE_SPEED: f32 = 20.0;
 
-
 pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;

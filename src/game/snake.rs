@@ -1,6 +1,9 @@
-use crate::config::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use macroquad::prelude::{Color, Vec2, draw_rectangle, vec2};
+use crate::{common::to_color, config::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_SPEED}};
+use macroquad::prelude::{draw_rectangle};
+use bincode::{Decode, Encode};
+use crate::common::{MyVec2, MyColor};
 
+#[derive(Decode, Encode, Debug)]
 pub(crate) enum Direction {
     Up,
     Down,
@@ -8,25 +11,26 @@ pub(crate) enum Direction {
     Right,
 }
 
+#[derive(Decode, Encode, Debug)]
 pub(crate) struct Snake {
-    positions: Vec<Vec2>,
-    previous_tail_position: Vec2,
+    positions: Vec<MyVec2>,
+    previous_tail_position: MyVec2,
     direction: Direction,
     size: f32,
     speed: f32,
-    color: Color,
+    color: MyColor,
 }
 
 impl Snake {
-    pub(crate) fn new(size: f32, speed: f32, color: Color) -> Self {
-        let last_tail_pos = vec2(SCREEN_WIDTH / 2.0, SCREEN_HEIGHT / 2.0);
+    pub(crate) fn new(color: MyColor) -> Self {
+        let last_tail_pos = MyVec2::new(SCREEN_WIDTH / 2.0, SCREEN_HEIGHT / 2.0);
 
         let mut ret = Self {
             direction: Direction::Left,
             previous_tail_position: last_tail_pos,
             positions: Vec::from([last_tail_pos]),
-            size: size,
-            speed: speed,
+            size: SNAKE_SIZE,
+            speed: SNAKE_SPEED,
             color: color,
         };
 
@@ -74,7 +78,7 @@ impl Snake {
 
     pub(crate) fn draw(&self) {
         for pos in &self.positions {
-            draw_rectangle(pos.x, pos.y, self.size, self.size, self.color);
+            draw_rectangle(pos.x, pos.y, self.size, self.size, to_color(self.color));
         }
     }
 
@@ -92,7 +96,7 @@ impl Snake {
     }
 
     pub(crate) fn collides_self(&self) -> bool {
-        let head_pos: Vec2 = self.positions[0];
+        let head_pos: MyVec2 = self.positions[0];
 
         for i in 1..self.positions.len() {
             if self.positions[i] == head_pos {
@@ -102,7 +106,7 @@ impl Snake {
         false
     }
 
-    pub(crate) fn collides_fruit(&self, fruit: &Vec2) -> bool {
+    pub(crate) fn collides_fruit(&self, fruit: &MyVec2) -> bool {
         for i in 0..self.positions.len() {
             if self.positions[i] == *fruit {
                 return true;
