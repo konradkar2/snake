@@ -12,10 +12,7 @@ pub struct ServerHandle {
     handle: Arc<Server>,
 }
 
-
-
 use crate::ifc::Message;
-
 
 impl ServerHandle {
     pub fn new(bincode_cfg: Bincode_cfg) -> Self {

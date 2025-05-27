@@ -2,6 +2,7 @@ use std::{
     env::Args,
     io::Write,
     net::TcpStream,
+    sync::{Mutex, RwLock},
     thread::{self},
     time,
 };
@@ -12,62 +13,87 @@ pub mod game;
 use crate::config::*;
 pub mod config;
 
-use crate::server::*;
-pub mod server;
+use crate::multiplayer::server::*;
+pub mod multiplayer;
 
 pub mod common;
 pub mod ifc;
 
 use bincode::config as BincodeConfig;
-use ifc::{Message};
+use ifc::Message;
 use macroquad::prelude as mcq;
-use rand::rng;
-use std::env;
 
+use std::env;
+use std::sync::Arc;
+
+fn setup_screen() {
+    mcq::request_new_screen_size(SCREEN_WIDTH, SCREEN_HEIGHT);
+    mcq::next_frame();
+}
+
+#[derive(Debug)]
 enum Role {
     Server,
     Client,
 }
 
-fn read_role(args: &mut Args) -> Role {
+#[derive(Debug)]
+struct GameArgs {
+    role: Role,
+    nickname: String,
+}
+
+fn parse_args() -> GameArgs {
+    let mut args = env::args();
+    args.next().expect("executable name");
+
     let role_str = args.next().unwrap_or(String::from("server"));
-    println!("[info]: role is '{role_str}'");
-    match role_str.trim_end() {
+
+    let role = match role_str.trim_end() {
         "server" => Role::Server,
         _ => Role::Client,
+    };
+
+    let nickname: String = args.next().unwrap_or(DEFAULT_NICKNAME.to_string());
+
+    GameArgs {
+        role: role,
+        nickname: nickname,
     }
 }
 
+fn print_game_args(game_args: &GameArgs) {
+    println!("[Info]: role is '{:?}'", game_args.role);
+    println!("[Info]: nickname is '{}'", game_args.nickname);
+}
 
 #[macroquad::main("MyGame")]
 async fn main() {
-    let mut args = env::args();
-    args.next();
+    let game_args: GameArgs = parse_args();
+    print_game_args(&game_args);
 
-    let role = read_role(&mut args);
-    let player_name: String = args.next().unwrap_or("player".to_string());
+    setup_screen();
 
-    println!("[info]: player name: '{player_name}'");
     let bincode_cfg = BincodeConfig::standard();
 
     let mut frame_started_t: f64 = 0.0;
 
-    mcq::request_new_screen_size(SCREEN_WIDTH, SCREEN_HEIGHT);
-    mcq::next_frame().await;
-    let mut rng = rng();
+    let game_lock = Arc::new(Mutex::new(GameLocal::new(false, &game_args.nickname)));
 
-    let mut game = GameLocal::new(false, &player_name);
-    game.game_core.update_fruit_pos(&mut rng);
+    {
+        let game = game_lock.lock().unwrap();
+        println!("gameLocal: {:?}", game);
+    }
 
     let server_handle: ServerHandle;
     let mut client_handle: TcpStream;
-    match role {
+    match game_args.role {
         Role::Server => {
             server_handle = ServerHandle::new(bincode_cfg);
             server_handle.launch_server();
         }
         _ => {
-            let register_msg = Message::JoinLobby(player_name);
+            let register_msg = Message::JoinLobby(game_args.nickname);
             let encoded: Vec<u8> = bincode::encode_to_vec(&register_msg, bincode_cfg).unwrap();
             client_handle = TcpStream::connect("127.0.0.1:223").expect("connects to server");
             let bytes = client_handle.write(&encoded).unwrap();
@@ -75,17 +101,25 @@ async fn main() {
         }
     }
 
-    println!("gameLocal: {:?}", game);
+    let game_lock_update = Arc::clone(&game_lock);
+    thread::spawn(move || {
+        loop {
+            {
+                let mut game = game_lock_update.lock().unwrap();
+                game.update();
+            }
+            thread::sleep(time::Duration::from_secs_f64(TICK_RATE_TIME));
+        }
+    });
 
     loop {
-        game.draw();
-        mcq::draw_fps();
-
-        if let Some(c) = mcq::get_char_pressed() {
-            game.handle_input(c, &mut rng);
+        {
+            let mut game = game_lock.lock().unwrap();
+            if let Some(c) = mcq::get_char_pressed() {
+                game.handle_input(c);
+            }
+            game.draw();
         }
-
-        game.game_core.update(&mut rng);
 
         while (macroquad::time::get_time() - frame_started_t) <= FRAME_TIME {
             thread::sleep(time::Duration::from_micros(500));

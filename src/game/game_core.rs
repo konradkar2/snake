@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{
-    common::{MyColor, MyVec2, from_color},
+    common::{MyColor, MyVec2},
     config::*,
 };
-use rand::{Rng, rngs::ThreadRng};
+use rand::{rng, Rng};
 use macroquad::prelude as mcq;
 
 
@@ -34,14 +34,14 @@ pub struct GameCore {
     pub fruit_pos: Option<MyVec2>,
 }
 
-fn generate_fruit_pos(rng: &mut ThreadRng) -> MyVec2 {
+fn generate_fruit_pos() -> MyVec2 {
     let mut pos = MyVec2::new(0.0, 0.0);
 
     let n_snake_fits_x: u32 = (SCREEN_WIDTH / SNAKE_SIZE) as u32;
     let n_snake_fits_y: u32 = (SCREEN_HEIGHT / SNAKE_SIZE) as u32;
 
-    pos.x = SNAKE_SIZE * rng.random_range(0..n_snake_fits_x) as f32;
-    pos.y = SNAKE_SIZE * rng.random_range(0..n_snake_fits_y) as f32;
+    pos.x = SNAKE_SIZE * rng().random_range(0..n_snake_fits_x) as f32;
+    pos.y = SNAKE_SIZE * rng().random_range(0..n_snake_fits_y) as f32;
 
     pos
 }
@@ -62,11 +62,11 @@ impl GameCore {
             .insert(name.to_string(), Player { is_loser: false });
     }
 
-    pub fn update_fruit_pos(&mut self, rng: &mut ThreadRng) {
+    pub fn update_fruit_pos(&mut self) {
         let mut new_fruit_pos;
 
         loop {
-            new_fruit_pos = generate_fruit_pos(rng);
+            new_fruit_pos = generate_fruit_pos();
             let mut fruit_collides = false;
             for (_, (_, snake)) in self.snakes.iter().enumerate() {
                 if snake.collides_fruit(&new_fruit_pos) {
@@ -81,7 +81,7 @@ impl GameCore {
         self.fruit_pos = Some(new_fruit_pos);
     }
 
-    pub fn update(&mut self, rng: &mut ThreadRng) {
+    pub fn update(&mut self, update_fruit_pos: bool) {
         match self.state {
             GameState::Playing => {
                 for (player_name, snake) in self.snakes.iter_mut() {
@@ -98,18 +98,18 @@ impl GameCore {
                         }
                     }
 
-                    snake.move_step();
+                    snake.move_step_tick();
                 }
 
-                if self.fruit_pos.is_none() {
-                    self.update_fruit_pos(rng);
+                if update_fruit_pos && self.fruit_pos.is_none() {
+                    self.update_fruit_pos();
                 }
             }
             _ => {}
         }
     }
 
-    pub fn handle_input(&mut self, player_name: &str, c: char, rng: &mut ThreadRng) {
+    pub fn handle_input(&mut self, player_name: &str, c: char) {
         match self.state {
             GameState::Playing => match c {
                     'w' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Up),
@@ -117,7 +117,7 @@ impl GameCore {
                     'a' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Left),
                     'd' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Right),
                     'l' => self.snakes.get_mut(player_name).unwrap().grow(),
-                    'k' => self.update_fruit_pos(rng),
+                    'k' => self.update_fruit_pos(),
                     '\x1B' /*escape */ =>  self.state = GameState::Paused,
                     _ => {}
                 },
@@ -126,7 +126,7 @@ impl GameCore {
                          _ => {}
                     },
             GameState::Menu => match c {
-                '\x0D' => self.state = GameState::Playing,
+                '\x0D' /*enter */ => self.state = GameState::Playing,
                 _ => {}
             },
             GameState::Finished => match c {

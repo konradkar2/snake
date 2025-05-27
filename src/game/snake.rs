@@ -1,7 +1,10 @@
-use crate::{common::to_color, config::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_SPEED}};
-use macroquad::prelude::{draw_rectangle};
+use crate::common::{MyColor, MyVec2};
+use crate::{
+    common::to_color,
+    config::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE},
+};
 use bincode::{Decode, Encode};
-use crate::common::{MyVec2, MyColor};
+use macroquad::prelude::draw_rectangle;
 
 #[derive(Decode, Encode, Debug)]
 pub(crate) enum Direction {
@@ -16,9 +19,8 @@ pub(crate) struct Snake {
     positions: Vec<MyVec2>,
     previous_tail_position: MyVec2,
     direction: Direction,
-    size: f32,
-    speed: f32,
     color: MyColor,
+    update_counter: u32,
 }
 
 impl Snake {
@@ -29,9 +31,8 @@ impl Snake {
             direction: Direction::Left,
             previous_tail_position: last_tail_pos,
             positions: Vec::from([last_tail_pos]),
-            size: SNAKE_SIZE,
-            speed: SNAKE_SPEED,
             color: color,
+            update_counter: 0,
         };
 
         ret.move_step();
@@ -40,7 +41,7 @@ impl Snake {
         ret
     }
 
-    pub(crate) fn move_step(&mut self) {
+    fn move_step(&mut self) {
         let tail_pos = self.positions.last_mut().unwrap();
         self.previous_tail_position = *tail_pos;
 
@@ -53,10 +54,10 @@ impl Snake {
         let head_pos = &mut self.positions[0];
 
         match self.direction {
-            Direction::Up => head_pos.y -= self.speed,
-            Direction::Down => head_pos.y += self.speed,
-            Direction::Left => head_pos.x -= self.speed,
-            Direction::Right => head_pos.x += self.speed,
+            Direction::Up => head_pos.y -= SNAKE_SIZE,
+            Direction::Down => head_pos.y += SNAKE_SIZE,
+            Direction::Left => head_pos.x -= SNAKE_SIZE,
+            Direction::Right => head_pos.x += SNAKE_SIZE,
         }
 
         if head_pos.x > SCREEN_WIDTH {
@@ -72,13 +73,22 @@ impl Snake {
         }
     }
 
+    pub(crate) fn move_step_tick(&mut self) {
+        self.update_counter += 1;
+        if self.update_counter % SNAKE_TICKS_PER_MOVE as u32 != 0 {
+            return;
+        }
+
+        self.move_step();
+    }
+
     pub(crate) fn grow(&mut self) {
         self.positions.push(self.previous_tail_position);
     }
 
     pub(crate) fn draw(&self) {
         for pos in &self.positions {
-            draw_rectangle(pos.x, pos.y, self.size, self.size, to_color(self.color));
+            draw_rectangle(pos.x, pos.y, SNAKE_SIZE, SNAKE_SIZE, to_color(self.color));
         }
     }
 

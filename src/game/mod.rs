@@ -1,13 +1,12 @@
 pub mod game_core;
 use crate::game_core::*;
 use macroquad::prelude as mcq;
-use rand::rngs::ThreadRng;
 pub mod snake;
 use crate::common::from_color;
 
 #[derive(Debug)]
 pub struct GameLocal {
-    pub game_core: GameCore,
+    game_core: GameCore,
     is_multiplayer: bool,
     player_name: String,
 }
@@ -45,11 +44,16 @@ impl GameLocal {
         }
     }
 
-    pub fn handle_input(&mut self, c: char, rng: &mut ThreadRng) {
-        self.game_core.handle_input(&self.player_name, c, rng);
+    pub fn update(&mut self) 
+    {
+        self.game_core.update(true);
     }
 
-    pub fn draw(&mut self) {
+    pub fn handle_input(&mut self, c: char) {
+        self.game_core.handle_input(&self.player_name, c);
+    }
+
+    pub fn draw(&self) {
         mcq::clear_background(mcq::RED);
         match self.game_core.state {
             GameState::Paused => {
@@ -99,5 +103,6 @@ impl GameLocal {
             }
             _ => self.game_core.draw_objects(),
         }
+        mcq::draw_fps();
     }
 }
