@@ -1,12 +1,12 @@
 use crate::common::{MyColor, MyVec2};
 use crate::{
     common::to_color,
-    config::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE},
+    snake_cfg::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE},
 };
 use bincode::{Decode, Encode};
 use macroquad::prelude::draw_rectangle;
 
-#[derive(Decode, Encode, Debug)]
+#[derive(Decode, Encode, Debug, Clone)]
 pub(crate) enum Direction {
     Up,
     Down,
@@ -14,7 +14,7 @@ pub(crate) enum Direction {
     Right,
 }
 
-#[derive(Decode, Encode, Debug)]
+#[derive(Decode, Encode, Debug, Clone)]
 pub(crate) struct Snake {
     positions: Vec<MyVec2>,
     previous_tail_position: MyVec2,

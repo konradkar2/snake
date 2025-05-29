@@ -3,7 +3,17 @@ name = "snake"
 version = "0.1.0"
 edition = "2024"
 
+
+[[bin]]
+name = "snake_client"
+path = "src/snake_client.rs"
+
+[[bin]]
+name = "snake_server"
+path = "src/snake_server.rs"
+
 [dependencies]
 rand = "0.9.1"
 macroquad = "0.4.14"
 bincode = "2.0.1"
+mio = { version = "1", features = ["os-poll", "net"] }

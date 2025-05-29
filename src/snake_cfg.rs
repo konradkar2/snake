@@ -1,3 +1,5 @@
+use macroquad::color::{GREEN, PINK};
+
 
 pub const FPS: u64 = 60;
 pub const TICK_RATE_FREQ: u64 = 120;
@@ -14,3 +16,8 @@ pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;
 
 pub const DEFAULT_NICKNAME: &'static str = "player";
+pub const SERVER_ADDRESS: &'static str = "0.0.0.0:223";
+
+pub const PLAYER_COUNT: usize = 2;
+
+pub const PLAYER_COLORS: [macroquad::color::Color;  PLAYER_COUNT] = [PINK, GREEN];

@@ -2,37 +2,44 @@ use std::collections::HashMap;
 
 use crate::{
     common::{MyColor, MyVec2},
-    config::*,
+    snake_cfg::*,
 };
-use rand::{rng, Rng};
 use macroquad::prelude as mcq;
-
+use rand::{Rng, rng};
 
 use crate::snake::{Direction, Snake};
 
-
 use bincode::{Decode, Encode};
 
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, Debug, Clone)]
 pub enum GameState {
-    Menu,
+    NotPlaying,
     Playing,
-    Paused,
-    Finished,
 }
 
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+pub enum PlayerState {
+    NotReady,
+    Ready,
+}
+
+#[derive(Encode, Decode, Debug, Clone)]
 pub struct Player {
+    pub name: String,
+    pub state: PlayerState,
     pub is_loser: bool,
 }
 
-#[derive(Encode, Decode, Debug)]
+#[derive(Encode, Decode, Debug, Clone)]
 pub struct GameCore {
     pub state: GameState,
     pub players: HashMap<String, Player>,
     snakes: HashMap<String, Snake>,
     pub fruit_pos: Option<MyVec2>,
 }
+
+const ENTER: char = '\x0D';
+const ESCAPE: char = '\x1B';
 
 fn generate_fruit_pos() -> MyVec2 {
     let mut pos = MyVec2::new(0.0, 0.0);
@@ -49,7 +56,7 @@ fn generate_fruit_pos() -> MyVec2 {
 impl GameCore {
     pub fn new() -> Self {
         Self {
-            state: GameState::Menu,
+            state: GameState::NotPlaying,
             snakes: HashMap::new(),
             players: HashMap::new(),
             fruit_pos: None,
@@ -58,8 +65,19 @@ impl GameCore {
 
     pub fn add_player(&mut self, name: &str, color: MyColor) {
         self.snakes.insert(name.to_string(), Snake::new(color));
-        self.players
-            .insert(name.to_string(), Player { is_loser: false });
+        self.players.insert(
+            name.to_string(),
+            Player {
+                is_loser: false,
+                name: name.to_string(),
+                state: PlayerState::NotReady,
+            },
+        );
+    }
+
+    pub fn remove_player(&mut self, name: &str) {
+        self.snakes.remove(name);
+        self.players.remove(name);
     }
 
     pub fn update_fruit_pos(&mut self) {
@@ -84,9 +102,21 @@ impl GameCore {
     pub fn update(&mut self, update_fruit_pos: bool) {
         match self.state {
             GameState::Playing => {
+                if self.players.len() < PLAYER_COUNT {
+                    self.state = GameState::NotPlaying;
+                    return;
+                }
+
+                if self.players.iter().any(|player| {
+                    return player.1.state == PlayerState::NotReady;
+                }) {
+                    self.state = GameState::NotPlaying;
+                    return;
+                }
+
                 for (player_name, snake) in self.snakes.iter_mut() {
                     if snake.collides_self() {
-                        self.state = GameState::Finished;
+                        self.state = GameState::NotPlaying;
                         self.players.get_mut(player_name).unwrap().is_loser = true;
                         return;
                     }
@@ -105,44 +135,40 @@ impl GameCore {
                     self.update_fruit_pos();
                 }
             }
-            _ => {}
+            GameState::NotPlaying => {
+                if self.players.len() == PLAYER_COUNT {
+                    if self.players.iter().all(|player| {
+                        return player.1.state == PlayerState::Ready;
+                    }) {
+                        self.state = GameState::Playing;
+                        return;
+                    }
+                }
+            },
         }
     }
 
     pub fn handle_input(&mut self, player_name: &str, c: char) {
-        match self.state {
-            GameState::Playing => match c {
-                    'w' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Up),
-                    's' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Down),
-                    'a' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Left),
-                    'd' => self.snakes.get_mut(player_name).unwrap().change_direction(Direction::Right),
-                    'l' => self.snakes.get_mut(player_name).unwrap().grow(),
-                    'k' => self.update_fruit_pos(),
-                    '\x1B' /*escape */ =>  self.state = GameState::Paused,
-                    _ => {}
-                },
-            GameState::Paused => match c {
-                         '\x1B' /*escape */ =>  self.state = GameState::Playing,
-                         _ => {}
-                    },
-            GameState::Menu => match c {
-                '\x0D' /*enter */ => self.state = GameState::Playing,
-                _ => {}
-            },
-            GameState::Finished => match c {
-                // '\x0D' => {
-                //     *self.snakes.get_mut(player_name).unwrap() =
-                //         Snake::new(SNAKE_SIZE, SNAKE_SPEED, from_color(mcq::GREEN));
+        let player_state = &mut self.players.get_mut(player_name).unwrap().state;
 
-                //     self.state = GameState::Playing;
-                // }
+        match player_state {
+            PlayerState::NotReady => match c {
+                ENTER => {
+                    *player_state = PlayerState::Ready;
+                }
                 _ => {}
             },
-            _ => match c {
-                _ => {
-                    println!("pressed: {}", c)
+            PlayerState::Ready => {
+                let snake = self.snakes.get_mut(player_name).unwrap();
+                match c {
+                    'w' => snake.change_direction(Direction::Up),
+                    's' => snake.change_direction(Direction::Down),
+                    'a' => snake.change_direction(Direction::Left),
+                    'd' => snake.change_direction(Direction::Right),
+                    ESCAPE => *player_state = PlayerState::NotReady,
+                    _ => {}
                 }
-            },
+            }
         }
     }
 

@@ -1,12 +1,12 @@
 pub mod game_core;
-use crate::game_core::*;
+use crate::{game_core::*, snake_cfg::PLAYER_COUNT};
 use macroquad::prelude as mcq;
 pub mod snake;
 use crate::common::from_color;
 
 #[derive(Debug)]
 pub struct GameLocal {
-    game_core: GameCore,
+    pub game_core: GameCore,
     is_multiplayer: bool,
     player_name: String,
 }
@@ -27,7 +27,7 @@ fn draw_big_text(text: &str, color: mcq::Color) {
         text,
         mcq::screen_width() / 2.0,
         mcq::screen_height() / 2.0,
-        100.0,
+        50.0,
         color,
     );
 }
@@ -44,8 +44,7 @@ impl GameLocal {
         }
     }
 
-    pub fn update(&mut self) 
-    {
+    pub fn update(&mut self) {
         self.game_core.update(true);
     }
 
@@ -56,7 +55,7 @@ impl GameLocal {
     pub fn draw(&self) {
         mcq::clear_background(mcq::RED);
         match self.game_core.state {
-            GameState::Paused => {
+            GameState::NotPlaying => {
                 mcq::draw_rectangle(
                     0.0,
                     0.0,
@@ -65,41 +64,30 @@ impl GameLocal {
                     mcq::BLUE,
                 );
                 self.game_core.draw_objects();
-                draw_big_text("Paused", mcq::RED);
-            }
-            GameState::Menu => {
-                draw_big_text("Start", mcq::GREEN);
-            }
-            GameState::Finished => {
-                let winner: &str;
 
-                if self.is_multiplayer {
-                    winner = self
-                        .game_core
-                        .players
-                        .iter()
-                        .find(|(_, player)| player.is_loser == false)
-                        .expect("a player has lost")
-                        .0;
+                let mut text = String::new();
+
+                let players = &self.game_core.players;
+                if players.len() != PLAYER_COUNT {
+                    text = String::from("Waiting for all players");
                 } else {
-                    winner = "";
-                }
+                    let mut player_names: Vec<String> = players.keys().cloned().collect();
+                    player_names.sort_unstable();
+                    
+                    for player_name in &player_names {
+                        let player = &players[player_name];
+                        let state_str = {
+                            if player.state == PlayerState::NotReady {
+                                "not ready"
+                            } else {
+                                "ready"
+                            }
+                        };
 
-                mcq::draw_rectangle(
-                    0.0,
-                    0.0,
-                    mcq::screen_width(),
-                    mcq::screen_height(),
-                    mcq::DARKPURPLE,
-                );
-
-                let text: String;
-                if self.is_multiplayer {
-                    text = format!("player: {}", winner);
-                } else {
-                    text = String::from("You lost!");
+                        text += format!("player {}: {}\n", player.name, state_str).as_str();
+                    }
                 }
-                draw_big_text(text.as_str(), mcq::RED);
+                mcq::draw_multiline_text(&text, 20.0, 100.0, 30.0, None, mcq::RED);
             }
             _ => self.game_core.draw_objects(),
         }
