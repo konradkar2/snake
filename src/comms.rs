@@ -76,7 +76,7 @@ impl Comms {
 
         let (decoded, _): (Message, usize) =
             bincode::decode_from_slice(&buffer[..], self.bincode_cfg).map_err(|err| {
-                eprintln!("[ERROR] Failed to deserialize data {}", err);
+                eprintln!("[ERROR] Failed to deserialize data (read size: {}): {}", bytes, err);
                 CommError::Unknown
             })?;
 

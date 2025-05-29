@@ -48,7 +48,10 @@ fn parse_args() -> GameArgs {
     let nickname: String = args.next().unwrap_or(DEFAULT_NICKNAME.to_string());
     let ip: String = args.next().expect("Podaj ip huju");
 
-    GameArgs { nickname: nickname, server_ip: ip }
+    GameArgs {
+        nickname: nickname,
+        server_ip: ip,
+    }
 }
 
 fn print_game_args(game_args: &GameArgs) {
@@ -64,9 +67,7 @@ struct Client {
 
 impl Client {
     fn connect(&mut self) {
-        self.comms
-            .connect(&self.game_args.server_ip)
-            .expect("failed to connected to the server");
+        self.comms.connect(&self.game_args.server_ip).unwrap();
     }
 
     fn join_server(&mut self) -> Result<(), ClientError> {
@@ -107,7 +108,7 @@ impl Client {
         if let Message::GameUpdate(new_state) = response {
             let mut game_guard = self.game_guard.lock().unwrap();
             game_guard.game_core = new_state;
-            
+
             self.update_count += 1;
             if self.update_count % 100 == 0 {
                 println!("Received 100 updates!");
@@ -151,6 +152,7 @@ async fn main() {
         };
 
         client.connect();
+
         client.join_server().unwrap();
 
         loop {
