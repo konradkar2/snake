@@ -59,10 +59,7 @@ impl Server {
 
     fn handle_connection(&mut self, stream: TcpStream) -> Result<(), CommError> {
         println!("[SERVER]: client connecting {:?}...", stream.peer_addr());
-        let comms_rc = Rc::new(RefCell::new(Comms {
-            bincode_cfg: config::standard(),
-            connection: Some(stream),
-        }));
+        let comms_rc = Rc::new(RefCell::new(Comms::new(Some(stream))));
 
         let msg: Message = comms_rc.borrow_mut().receive_message()?;
         println!("[SERVER]: got msg: {:?}", msg);

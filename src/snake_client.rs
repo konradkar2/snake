@@ -100,19 +100,24 @@ impl Client {
     }
 
     fn synch_game(&mut self) -> Result<(), ClientError> {
-        let response = self
-            .comms
-            .receive_message()
-            .map_err(|_| ClientError::ConnectionError)?;
+        let response = self.comms.receive_message();
+        match response {
+            Ok(response) => {
+                if let Message::GameUpdate(new_state) = response {
+                    let mut game_guard = self.game_guard.lock().unwrap();
+                    game_guard.game_core = new_state;
 
-        if let Message::GameUpdate(new_state) = response {
-            let mut game_guard = self.game_guard.lock().unwrap();
-            game_guard.game_core = new_state;
-
-            self.update_count += 1;
-            if self.update_count % 100 == 0 {
-                println!("Received 100 updates!");
+                    self.update_count += 1;
+                    if self.update_count % 100 == 0 {
+                        println!("Received 100 updates!");
+                    }
+                }
+            },
+            Err(CommError::WaitingForMoreData) => {
+                eprintln!("[WARNING] waiting for more data...")
             }
+            Err(CommError::WouldBlock) => {}
+            Err(_) => return Err(ClientError::ConnectionError)
         }
 
         Ok(())
@@ -142,17 +147,13 @@ async fn main() {
     let (tx, rx): (Sender<char>, Receiver<char>) = channel();
     thread::spawn(move || {
         let mut client = Client {
-            comms: Comms {
-                bincode_cfg: config::standard(),
-                connection: None,
-            },
+            comms: Comms::new(None),
             game_args: game_args,
             game_guard: game_lock_comms,
             update_count: 0,
         };
 
         client.connect();
-
         client.join_server().unwrap();
 
         loop {
