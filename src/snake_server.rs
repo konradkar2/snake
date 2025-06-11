@@ -53,6 +53,8 @@ impl Server {
     fn remove_player(&mut self, nickname: &str) {
         println!("[WARNING] removing player {}", nickname);
         self.player_comms.remove(nickname);
+        self.state = ServerState::WaitingForPlayers;
+
         let mut game_guard = self.game_guard.lock().unwrap();
         game_guard.remove_player(nickname);
     }
@@ -107,7 +109,6 @@ impl Server {
 
         for player in disconnected_players {
             self.remove_player(player.as_str());
-            self.state = ServerState::WaitingForPlayers;
         }
     }
 
@@ -137,7 +138,6 @@ impl Server {
 
         for player in disconnected_players {
             self.remove_player(player.as_str());
-            self.state = ServerState::WaitingForPlayers;
         }
     }
 

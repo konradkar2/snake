@@ -99,9 +99,9 @@ impl Comms {
             );
         })?;
 
-        // stream.set_nonblocking(true).inspect_err(|err| {
-        //     eprintln!("[ERROR] Failed to set non blocking: {}", err);
-        // })?;
+        stream.set_nonblocking(true).inspect_err(|err| {
+            eprintln!("[ERROR] Failed to set non blocking: {}", err);
+        })?;
 
         self.connection = Some(stream);
         Ok(())

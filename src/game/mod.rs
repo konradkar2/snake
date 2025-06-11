@@ -55,7 +55,7 @@ impl GameLocal {
     pub fn draw(&self) {
         mcq::clear_background(mcq::RED);
         match self.game_core.state {
-            GameState::NotPlaying => {
+            GameState::Paused => {
                 mcq::draw_rectangle(
                     0.0,
                     0.0,
@@ -88,6 +88,15 @@ impl GameLocal {
                     }
                 }
                 mcq::draw_multiline_text(&text, 20.0, 100.0, 30.0, None, mcq::RED);
+            },
+            GameState::Finished => {
+                mcq::draw_rectangle(
+                    0.0,
+                    0.0,
+                    mcq::screen_width(),
+                    mcq::screen_height(),
+                    mcq::GOLD,
+                );
             }
             _ => self.game_core.draw_objects(),
         }

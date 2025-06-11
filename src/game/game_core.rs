@@ -13,9 +13,11 @@ use bincode::{Decode, Encode};
 
 #[derive(Encode, Decode, Debug, Clone)]
 pub enum GameState {
-    NotPlaying,
+    Paused,
     Playing,
+    Finished,
 }
+
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub enum PlayerState {
@@ -53,10 +55,12 @@ fn generate_fruit_pos() -> MyVec2 {
     pos
 }
 
+
+
 impl GameCore {
     pub fn new() -> Self {
         Self {
-            state: GameState::NotPlaying,
+            state: GameState::Paused,
             snakes: HashMap::new(),
             players: HashMap::new(),
             fruit_pos: None,
@@ -78,6 +82,7 @@ impl GameCore {
     pub fn remove_player(&mut self, name: &str) {
         self.snakes.remove(name);
         self.players.remove(name);
+        self.state = GameState::Paused
     }
 
     pub fn update_fruit_pos(&mut self) {
@@ -98,25 +103,36 @@ impl GameCore {
 
         self.fruit_pos = Some(new_fruit_pos);
     }
+    
+
+    pub fn snake_collided(&self) -> Option<(&str, &str)> {
+        for (player_name, snake) in self.snakes.iter() {
+            
+        }
+
+        //return Some((self.players.keys().nth(0).unwrap(), self.players.keys().nth(1).unwrap()));
+        None
+    }
 
     pub fn update(&mut self, update_fruit_pos: bool) {
         match self.state {
             GameState::Playing => {
-                if self.players.len() < PLAYER_COUNT {
-                    self.state = GameState::NotPlaying;
-                    return;
-                }
 
                 if self.players.iter().any(|player| {
                     return player.1.state == PlayerState::NotReady;
                 }) {
-                    self.state = GameState::NotPlaying;
+                    self.state = GameState::Paused;
                     return;
                 }
 
+                if let Some((winner, loser)) = self.snake_collided() {
+
+                }
+
+
                 for (player_name, snake) in self.snakes.iter_mut() {
                     if snake.collides_self() {
-                        self.state = GameState::NotPlaying;
+                        self.state = GameState::Finished;
                         self.players.get_mut(player_name).unwrap().is_loser = true;
                         return;
                     }
@@ -135,7 +151,7 @@ impl GameCore {
                     self.update_fruit_pos();
                 }
             }
-            GameState::NotPlaying => {
+            GameState::Paused => {
                 if self.players.len() == PLAYER_COUNT {
                     if self.players.iter().all(|player| {
                         return player.1.state == PlayerState::Ready;
@@ -144,7 +160,20 @@ impl GameCore {
                         return;
                     }
                 }
-            },
+            }
+            GameState::Finished => {
+                if self.players.len() < PLAYER_COUNT {
+                    self.state = GameState::Paused;
+                    return;
+                }
+
+                if self.players.iter().all(|player| {
+                    return player.1.state == PlayerState::Ready;
+                }) {
+                    self.state = GameState::Playing;
+                    return;
+                }
+            }
         }
     }
 

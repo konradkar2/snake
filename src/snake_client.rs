@@ -66,8 +66,10 @@ struct Client {
 }
 
 impl Client {
-    fn connect(&mut self) {
-        self.comms.connect(&self.game_args.server_ip).unwrap();
+    fn connect(&mut self) -> Result<(), ClientError> {
+        self.comms
+            .connect(&self.game_args.server_ip)
+            .map_err(|_| ClientError::ConnectionError)
     }
 
     fn join_server(&mut self) -> Result<(), ClientError> {
@@ -92,7 +94,6 @@ impl Client {
 
     fn send_input(&mut self, c: char) -> Result<(), ClientError> {
         let message = Message::SendInput(c);
-
         self.comms.send_message(&message).map_err(|err| {
             eprintln!("[ERROR]: failed to send input: {:?}", err);
             ClientError::ConnectionError
@@ -108,16 +109,16 @@ impl Client {
                     game_guard.game_core = new_state;
 
                     self.update_count += 1;
-                    if self.update_count % 100 == 0 {
-                        println!("Received 100 updates!");
+                    if self.update_count % TICK_RATE_FREQ as usize == 0 {
+                        println!("Received {} updates!", TICK_RATE_FREQ);
                     }
                 }
-            },
+            }
             Err(CommError::WaitingForMoreData) => {
                 eprintln!("[WARNING] waiting for more data...")
             }
             Err(CommError::WouldBlock) => {}
-            Err(_) => return Err(ClientError::ConnectionError)
+            Err(_) => return Err(ClientError::ConnectionError),
         }
 
         Ok(())
@@ -125,7 +126,7 @@ impl Client {
 }
 
 #[macroquad::main("MyGame")]
-async fn main() {
+async fn main() -> Result<(),()>{
     let game_args: GameArgs = parse_args();
     print_game_args(&game_args);
 
@@ -153,8 +154,9 @@ async fn main() {
             update_count: 0,
         };
 
-        client.connect();
-        client.join_server().unwrap();
+        client.connect().expect("failed to connect to the server");
+        client.join_server().expect("failed to join the server");
+
 
         loop {
             {
