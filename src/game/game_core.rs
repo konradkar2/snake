@@ -11,13 +11,14 @@ use crate::snake::{Direction, Snake};
 
 use bincode::{Decode, Encode};
 
+use super::snake::SnakesColission;
+
 #[derive(Encode, Decode, Debug, Clone)]
 pub enum GameState {
     Paused,
     Playing,
     Finished,
 }
-
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
 pub enum PlayerState {
@@ -55,7 +56,17 @@ fn generate_fruit_pos() -> MyVec2 {
     pos
 }
 
+fn align_to_snake_size(pos: f32) -> u32 {
+    let pos = pos as u32;
+    let remainder = pos % SNAKE_SIZE as u32;
+    pos - remainder
+}
 
+enum PlayerColission {
+    SelfColission(String),
+    InBetween(SnakesColission, String, String),
+    FruitColission(String),
+}
 
 impl GameCore {
     pub fn new() -> Self {
@@ -68,7 +79,27 @@ impl GameCore {
     }
 
     pub fn add_player(&mut self, name: &str, color: MyColor) {
-        self.snakes.insert(name.to_string(), Snake::new(color));
+        let player_count = self.players.iter().count();
+
+        let x_start = {
+            let mut block = SCREEN_WIDTH / (PLAYER_COUNT_MAX + 1) as f32;
+            block = block * player_count as f32;
+            align_to_snake_size(block) as f32
+        };
+        let y_start = {
+            let mut block = SCREEN_HEIGHT / (PLAYER_COUNT_MAX + 1) as f32;
+            block = block * player_count as f32;
+            align_to_snake_size(block)  as f32
+        };
+
+        
+        
+
+        self.snakes.insert(
+            name.to_string(),
+            Snake::new(color, MyVec2::new(x_start, y_start)),
+        );
+
         self.players.insert(
             name.to_string(),
             Player {
@@ -92,7 +123,7 @@ impl GameCore {
             new_fruit_pos = generate_fruit_pos();
             let mut fruit_collides = false;
             for (_, (_, snake)) in self.snakes.iter().enumerate() {
-                if snake.collides_fruit(&new_fruit_pos) {
+                if snake.collides_object(&new_fruit_pos) {
                     fruit_collides = true;
                 }
             }
@@ -103,21 +134,87 @@ impl GameCore {
 
         self.fruit_pos = Some(new_fruit_pos);
     }
-    
 
-    pub fn snake_collided(&self) -> Option<(&str, &str)> {
+    pub fn get_colissions(&self) -> Option<PlayerColission> {
         for (player_name, snake) in self.snakes.iter() {
-            
+            if snake.collides_self() {
+                return Some(PlayerColission::SelfColission(player_name.clone()));
+            }
+
+            if let Some(fruit_pos) = &self.fruit_pos {
+                if snake.collides_object(fruit_pos) {
+                    return Some(PlayerColission::FruitColission(player_name.clone()));
+                }
+            }
+        }
+
+        if self.snakes.iter().count() > 2 {
+            todo!("colissions for more than 2 player");
+        }
+
+        let (player1_name, player1_snake) = self.snakes.iter().nth(0).unwrap();
+        let (player2_name, player2_snake) = self.snakes.iter().nth(1).unwrap();
+
+        if let Some(colission) = player1_snake.collides_other(player2_snake) {
+            return Some(PlayerColission::InBetween(
+                colission,
+                player1_name.clone(),
+                player2_name.clone(),
+            ));
+        }
+
+        if let Some(colission) = player2_snake.collides_other(player1_snake) {
+            return Some(PlayerColission::InBetween(
+                colission,
+                player2_name.clone(),
+                player1_name.clone(),
+            ));
         }
 
         //return Some((self.players.keys().nth(0).unwrap(), self.players.keys().nth(1).unwrap()));
         None
     }
 
+    pub fn finish_the_game(&mut self) {
+        for (_, player) in &mut self.players {
+            player.state = PlayerState::NotReady;
+        }
+        self.state = GameState::Finished;
+    }
+
+    pub fn check_collissions(&mut self) {
+        if let Some(player_colission) = self.get_colissions() {
+            match player_colission {
+                PlayerColission::FruitColission(player_name) => {
+                    if let Some(snake) = self.snakes.get_mut(player_name.as_str()) {
+                        snake.grow();
+                        self.fruit_pos = None;
+                    };
+                }
+                PlayerColission::SelfColission(player_name) => {
+                    self.players.get_mut(&player_name).unwrap().is_loser = true;
+                    self.finish_the_game();
+                }
+                PlayerColission::InBetween(snakes_colission, player_a, player_b) => {
+                    match snakes_colission {
+                        SnakesColission::HeadToHeadColission => {
+                            self.players.get_mut(&player_a).unwrap().is_loser = true;
+                            self.players.get_mut(&player_b).unwrap().is_loser = true;
+                        }
+                        SnakesColission::HeadToTailColission => {
+                            self.players.get_mut(&player_a).unwrap().is_loser = true;
+                            self.players.get_mut(&player_b).unwrap().is_loser = false;
+                        }
+                    }
+                    self.finish_the_game();
+                }
+            }
+        }
+    }
+
     pub fn update(&mut self, update_fruit_pos: bool) {
         match self.state {
             GameState::Playing => {
-
                 if self.players.iter().any(|player| {
                     return player.1.state == PlayerState::NotReady;
                 }) {
@@ -125,25 +222,9 @@ impl GameCore {
                     return;
                 }
 
-                if let Some((winner, loser)) = self.snake_collided() {
+                self.check_collissions();
 
-                }
-
-
-                for (player_name, snake) in self.snakes.iter_mut() {
-                    if snake.collides_self() {
-                        self.state = GameState::Finished;
-                        self.players.get_mut(player_name).unwrap().is_loser = true;
-                        return;
-                    }
-
-                    if let Some(fruit_pos) = &self.fruit_pos {
-                        if snake.collides_fruit(fruit_pos) {
-                            snake.grow();
-                            self.fruit_pos = None;
-                        }
-                    }
-
+                for (_, snake) in self.snakes.iter_mut() {
                     snake.move_step_tick();
                 }
 
@@ -152,7 +233,7 @@ impl GameCore {
                 }
             }
             GameState::Paused => {
-                if self.players.len() == PLAYER_COUNT {
+                if self.players.len() == PLAYER_COUNT_MAX {
                     if self.players.iter().all(|player| {
                         return player.1.state == PlayerState::Ready;
                     }) {
@@ -162,7 +243,7 @@ impl GameCore {
                 }
             }
             GameState::Finished => {
-                if self.players.len() < PLAYER_COUNT {
+                if self.players.len() < PLAYER_COUNT_MAX {
                     self.state = GameState::Paused;
                     return;
                 }

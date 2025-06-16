@@ -5,6 +5,7 @@ use crate::{
 };
 use bincode::{Decode, Encode};
 use macroquad::prelude::draw_rectangle;
+use rand::{Rng, rng};
 
 #[derive(Decode, Encode, Debug, Clone)]
 pub(crate) enum Direction {
@@ -12,6 +13,11 @@ pub(crate) enum Direction {
     Down,
     Left,
     Right,
+}
+
+pub(crate) enum SnakesColission {
+    HeadToTailColission,
+    HeadToHeadColission,
 }
 
 #[derive(Decode, Encode, Debug, Clone)]
@@ -24,8 +30,8 @@ pub(crate) struct Snake {
 }
 
 impl Snake {
-    pub(crate) fn new(color: MyColor) -> Self {
-        let last_tail_pos = MyVec2::new(SCREEN_WIDTH / 2.0, SCREEN_HEIGHT / 2.0);
+    pub(crate) fn new(color: MyColor, pos: MyVec2) -> Self {
+        let last_tail_pos = pos;
 
         let mut ret = Self {
             direction: Direction::Left,
@@ -39,6 +45,10 @@ impl Snake {
         ret.grow();
 
         ret
+    }
+
+    fn get_head_pos(&self) -> MyVec2 {
+        self.positions[0]
     }
 
     fn move_step(&mut self) {
@@ -106,7 +116,7 @@ impl Snake {
     }
 
     pub(crate) fn collides_self(&self) -> bool {
-        let head_pos: MyVec2 = self.positions[0];
+        let head_pos = self.get_head_pos();
 
         for i in 1..self.positions.len() {
             if self.positions[i] == head_pos {
@@ -116,9 +126,25 @@ impl Snake {
         false
     }
 
-    pub(crate) fn collides_fruit(&self, fruit: &MyVec2) -> bool {
+    pub(crate) fn collides_other(&self, other: &Snake) -> Option<SnakesColission> {
+        let head_pos = self.get_head_pos();
+
+        if head_pos == other.get_head_pos() {
+            return Some(SnakesColission::HeadToHeadColission);
+        }
+
+        for i in 1..other.positions.len() {
+            if other.positions[i] == head_pos {
+                return Some(SnakesColission::HeadToTailColission);
+            }
+        }
+
+        None
+    }
+
+    pub(crate) fn collides_object(&self, object: &MyVec2) -> bool {
         for i in 0..self.positions.len() {
-            if self.positions[i] == *fruit {
+            if self.positions[i] == *object {
                 return true;
             }
         }

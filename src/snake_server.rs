@@ -4,6 +4,7 @@ use game::game_core::GameCore;
 use macroquad::color::{GREEN, PINK};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::io::Error;
 use std::net::{TcpListener, TcpStream};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -141,9 +142,14 @@ impl Server {
         }
     }
 
-    fn main_loop(&mut self) {
-        let listener = TcpListener::bind(SERVER_ADDRESS).expect("binds succesfully");
-        listener.set_nonblocking(true).unwrap();
+    fn main_loop(&mut self) -> io::Result<()> {
+        let listener = TcpListener::bind(SERVER_ADDRESS).inspect_err(|err| {
+            eprintln!("[ERROR]: failed to bind to address {}: {}", SERVER_ADDRESS, err)
+        })?;
+
+        listener.set_nonblocking(true).inspect_err(|err| {
+            eprintln!("[ERROR]: failed to set nonblocking on socket");
+        })?;
 
         println!("[INFO]: Listening for connection at {}...", SERVER_ADDRESS);
 
@@ -193,7 +199,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
     });
 }
 
-fn main() {
+fn main() -> Result<(), ()>{
     let game_guard = Arc::new(Mutex::new(GameCore::new()));
 
     let mut server = Server {
@@ -204,5 +210,7 @@ fn main() {
 
     launch_game_update_thread(game_guard.clone());
 
-    server.main_loop();
+    server.main_loop().map_err(|_err| {
+        eprintln!("[ERROR]: failed to start main loop");
+    })
 }
