@@ -14,10 +14,15 @@ use bincode::{Decode, Encode};
 use super::snake::SnakesColission;
 
 #[derive(Encode, Decode, Debug, Clone)]
+
+struct WinDetails {
+    winner: String,
+}
+
 pub enum GameState {
     Paused,
     Playing,
-    Finished,
+    Finished(WinDetails),
 }
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
@@ -30,7 +35,6 @@ pub enum PlayerState {
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
-    pub is_loser: bool,
 }
 
 #[derive(Encode, Decode, Debug, Clone)]
@@ -89,11 +93,8 @@ impl GameCore {
         let y_start = {
             let mut block = SCREEN_HEIGHT / (PLAYER_COUNT_MAX + 1) as f32;
             block = block * player_count as f32;
-            align_to_snake_size(block)  as f32
+            align_to_snake_size(block) as f32
         };
-
-        
-        
 
         self.snakes.insert(
             name.to_string(),
@@ -171,15 +172,17 @@ impl GameCore {
             ));
         }
 
-        //return Some((self.players.keys().nth(0).unwrap(), self.players.keys().nth(1).unwrap()));
         None
     }
 
-    pub fn finish_the_game(&mut self) {
+    pub fn finish_the_game(&mut self, winner: &str) {
         for (_, player) in &mut self.players {
             player.state = PlayerState::NotReady;
         }
-        self.state = GameState::Finished;
+
+        self.state = GameState::Finished(WinDetails {
+            winner: winner.to_string(),
+        });
     }
 
     pub fn check_collissions(&mut self) {

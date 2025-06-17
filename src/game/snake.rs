@@ -51,6 +51,10 @@ impl Snake {
         self.positions[0]
     }
 
+    fn get_tail(&self) -> &[MyVec2] {
+        return &self.positions[1..];
+    }
+
     fn move_step(&mut self) {
         let tail_pos = self.positions.last_mut().unwrap();
         self.previous_tail_position = *tail_pos;
@@ -115,39 +119,39 @@ impl Snake {
         }
     }
 
-    pub(crate) fn collides_self(&self) -> bool {
-        let head_pos = self.get_head_pos();
+    fn collides_head(&self, object: &MyVec2) -> bool {
+        return self.get_head_pos() == *object;
+    }
 
-        for i in 1..self.positions.len() {
-            if self.positions[i] == head_pos {
+    fn collides_tail(&self, object: &MyVec2) -> bool {
+        for pos in self.get_tail() {
+            if *pos == *object {
                 return true;
             }
         }
         false
     }
 
+    pub(crate) fn collides_self(&self) -> bool {
+        let head_pos = self.get_head_pos();
+        self.collides_tail(&head_pos)
+    }
+
     pub(crate) fn collides_other(&self, other: &Snake) -> Option<SnakesColission> {
         let head_pos = self.get_head_pos();
 
-        if head_pos == other.get_head_pos() {
+        if other.collides_head(&head_pos) {
             return Some(SnakesColission::HeadToHeadColission);
         }
 
-        for i in 1..other.positions.len() {
-            if other.positions[i] == head_pos {
-                return Some(SnakesColission::HeadToTailColission);
-            }
+        if other.collides_tail(&head_pos) {
+            return Some(SnakesColission::HeadToTailColission);
         }
 
         None
     }
 
     pub(crate) fn collides_object(&self, object: &MyVec2) -> bool {
-        for i in 0..self.positions.len() {
-            if self.positions[i] == *object {
-                return true;
-            }
-        }
-        false
+        self.collides_head(object) || self.collides_tail(object)
     }
 }
