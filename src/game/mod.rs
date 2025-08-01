@@ -69,7 +69,7 @@ impl GameLocal {
     pub fn draw(&self) {
         mcq::clear_background(mcq::RED);
         match &self.game_core.state {
-            GameState::NotStarted | GameState::Paused  => {
+            GameState::NotStarted | GameState::Paused => {
                 mcq::draw_rectangle(
                     0.0,
                     0.0,
@@ -83,10 +83,9 @@ impl GameLocal {
 
                 let players = &self.game_core.players;
                 if players.len() != PLAYER_COUNT_MAX {
-                    text = String::from("Waiting for all players");
-                } else {
-                    text = self.get_players_status_text();
+                    text = String::from("Waiting for all players\n");
                 }
+                text = text + &self.get_players_status_text();
 
                 mcq::draw_multiline_text(&text, 20.0, 100.0, 30.0, None, mcq::RED);
             }
@@ -102,13 +101,14 @@ impl GameLocal {
                         game_status_text += format!("You win!\n").as_str();
                         background_color = mcq::DARKBLUE;
                     } else {
-                        game_status_text += format!("Player {} won!\n", finish_details.winner).as_str();
+                        game_status_text +=
+                            format!("Player {} won!\n", finish_details.winner).as_str();
                         background_color = mcq::RED;
                     }
                 }
 
                 let player_status_text = self.get_players_status_text();
-                
+
                 mcq::draw_rectangle(
                     0.0,
                     0.0,

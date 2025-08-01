@@ -18,5 +18,4 @@ pub enum Message
     Nok(String),
     GameUpdate(GameCore),
     SendInput(char),
-    NoUsePadding(Padding),
 }

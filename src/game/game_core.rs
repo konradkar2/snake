@@ -126,10 +126,15 @@ impl GameCore {
         );
     }
 
-    pub fn remove_player(&mut self, name: &str) {
-        self.snakes.remove(name);
-        self.players.remove(name);
+    pub fn reset_game_state(&mut self) {
         self.state = GameState::NotStarted;
+        self.fruit_pos = None;
+        self.snakes.clear();
+    }
+
+    pub fn remove_player(&mut self, name: &str) {
+        self.reset_game_state();
+        self.players.remove(name);
     }
 
     pub fn update_fruit_pos(&mut self) {
@@ -237,8 +242,6 @@ impl GameCore {
         }
     }
 
-    pub fn reset(&mut self) {}
-
     pub fn update(&mut self) {
         match &self.state {
             GameState::NotStarted => {
@@ -304,17 +307,30 @@ impl GameCore {
             PlayerState::NotReady => match c {
                 ENTER => {
                     *player_state = PlayerState::Ready;
+                    return;
                 }
                 _ => {}
             },
             PlayerState::Ready => {
-                let snake = self.snakes.get_mut(player_name).unwrap();
                 match c {
-                    'w' => snake.change_direction(Direction::Up),
-                    's' => snake.change_direction(Direction::Down),
-                    'a' => snake.change_direction(Direction::Left),
-                    'd' => snake.change_direction(Direction::Right),
-                    ESCAPE => *player_state = PlayerState::NotReady,
+                    ESCAPE => {
+                        *player_state = PlayerState::NotReady;
+                        return;
+                    }
+                    _ => {}
+                }
+
+                match &self.state {
+                    GameState::Playing => {
+                        let snake = self.snakes.get_mut(player_name).unwrap();
+                        match c {
+                            'w' => snake.change_direction(Direction::Up),
+                            's' => snake.change_direction(Direction::Down),
+                            'a' => snake.change_direction(Direction::Left),
+                            'd' => snake.change_direction(Direction::Right),
+                            _ => {}
+                        }
+                    }
                     _ => {}
                 }
             }

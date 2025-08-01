@@ -172,6 +172,9 @@ impl Server {
                             }
                         }
                     }
+                    if !self.player_comms.is_empty() {
+                        self.receive_messages();
+                    }
                 }
 
                 ServerState::Running => {
