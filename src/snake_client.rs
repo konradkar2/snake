@@ -134,7 +134,7 @@ async fn main() -> Result<(),()>{
 
     let mut frame_started_t: f64 = 0.0;
 
-    let game_lock = Arc::new(Mutex::new(GameLocal::new(false, &game_args.nickname)));
+    let game_lock = Arc::new(Mutex::new(GameLocal::new(&game_args.nickname)));
 
     {
         let game = game_lock.lock().unwrap();

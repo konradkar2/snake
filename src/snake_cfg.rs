@@ -6,7 +6,7 @@ pub const TICK_RATE_FREQ: u64 = 120;
 pub const TICK_RATE_TIME: f64 = 1.0 / TICK_RATE_FREQ as f64;
 
 pub const FRAME_TIME: f64 = 1.0 / FPS as f64;
-pub const SNAKE_UPDATE_FREQ: u64 = 10;
+pub const SNAKE_UPDATE_FREQ: u64 = 15;
 pub const SNAKE_UPDATE_STEP: u64 = FPS / SNAKE_UPDATE_FREQ;
 
 pub const SNAKE_SIZE: f32 = 20.0;

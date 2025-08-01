@@ -178,7 +178,7 @@ impl Comms {
                 }
             })?;
 
-        println!("written bytes: {}", total_len);
+        // println!("written bytes: {}", total_len);
 
         Ok(())
     }

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::{
-    common::{MyColor, MyVec2},
+    common::{MyColor, MyVec2, from_color},
     snake_cfg::*,
 };
 use macroquad::prelude as mcq;
@@ -15,14 +15,17 @@ use super::snake::SnakesColission;
 
 #[derive(Encode, Decode, Debug, Clone)]
 
-struct WinDetails {
-    winner: String,
+pub struct FinishDetails {
+    pub draw: bool,
+    pub winner: String,
 }
 
+#[derive(Encode, Decode, Debug, Clone)]
 pub enum GameState {
+    NotStarted,
     Paused,
     Playing,
-    Finished(WinDetails),
+    Finished(FinishDetails),
 }
 
 #[derive(Encode, Decode, Debug, Clone, PartialEq)]
@@ -40,9 +43,10 @@ pub struct Player {
 #[derive(Encode, Decode, Debug, Clone)]
 pub struct GameCore {
     pub state: GameState,
-    pub players: HashMap<String, Player>,
-    snakes: HashMap<String, Snake>,
+    pub players: BTreeMap<String, Player>,
+    snakes: BTreeMap<String, Snake>,
     pub fruit_pos: Option<MyVec2>,
+    is_server: bool,
 }
 
 const ENTER: char = '\x0D';
@@ -66,45 +70,56 @@ fn align_to_snake_size(pos: f32) -> u32 {
     pos - remainder
 }
 
-enum PlayerColission {
+pub enum PlayerColission {
     SelfColission(String),
     InBetween(SnakesColission, String, String),
     FruitColission(String),
 }
 
 impl GameCore {
-    pub fn new() -> Self {
+    pub fn new(is_server: bool) -> Self {
         Self {
-            state: GameState::Paused,
-            snakes: HashMap::new(),
-            players: HashMap::new(),
+            state: GameState::NotStarted,
+            snakes: BTreeMap::new(),
+            players: BTreeMap::new(),
             fruit_pos: None,
+            is_server,
         }
     }
 
-    pub fn add_player(&mut self, name: &str, color: MyColor) {
-        let player_count = self.players.iter().count();
+    pub fn start(&mut self) {
+        self.snakes.clear();
 
-        let x_start = {
+        for (index, (name, _player)) in self.players.iter().enumerate() {
+            self.snakes.insert(
+                name.to_string(),
+                Snake::new(
+                    from_color(PLAYER_COLORS[index]),
+                    Self::create_player_position(index),
+                ),
+            );
+        }
+    }
+
+    fn create_player_position(player_index: usize) -> MyVec2 {
+        let x = {
             let mut block = SCREEN_WIDTH / (PLAYER_COUNT_MAX + 1) as f32;
-            block = block * player_count as f32;
-            align_to_snake_size(block) as f32
-        };
-        let y_start = {
-            let mut block = SCREEN_HEIGHT / (PLAYER_COUNT_MAX + 1) as f32;
-            block = block * player_count as f32;
+            block = block * (player_index + 1) as f32;
             align_to_snake_size(block) as f32
         };
 
-        self.snakes.insert(
-            name.to_string(),
-            Snake::new(color, MyVec2::new(x_start, y_start)),
-        );
+        let y = {
+            let block = SCREEN_HEIGHT / 2.0;
+            align_to_snake_size(block) as f32
+        };
 
+        MyVec2 { x, y }
+    }
+
+    pub fn add_player(&mut self, name: &str) {
         self.players.insert(
             name.to_string(),
             Player {
-                is_loser: false,
                 name: name.to_string(),
                 state: PlayerState::NotReady,
             },
@@ -114,7 +129,7 @@ impl GameCore {
     pub fn remove_player(&mut self, name: &str) {
         self.snakes.remove(name);
         self.players.remove(name);
-        self.state = GameState::Paused
+        self.state = GameState::NotStarted;
     }
 
     pub fn update_fruit_pos(&mut self) {
@@ -175,14 +190,24 @@ impl GameCore {
         None
     }
 
-    pub fn finish_the_game(&mut self, winner: &str) {
+    pub fn finish_the_game(&mut self, winner: Option<&str>) {
         for (_, player) in &mut self.players {
             player.state = PlayerState::NotReady;
         }
 
-        self.state = GameState::Finished(WinDetails {
-            winner: winner.to_string(),
-        });
+        let details = FinishDetails {
+            draw: !winner.is_some(),
+            winner: winner.unwrap_or("").to_string(),
+        };
+        self.state = GameState::Finished(details);
+    }
+
+    pub fn get_enemy_name(&mut self, player_name: &str) -> String {
+        let enemy_name = self
+            .players
+            .values()
+            .find(|iter_player| iter_player.name != player_name);
+        return enemy_name.unwrap().name.clone();
     }
 
     pub fn check_collissions(&mut self) {
@@ -195,28 +220,38 @@ impl GameCore {
                     };
                 }
                 PlayerColission::SelfColission(player_name) => {
-                    self.players.get_mut(&player_name).unwrap().is_loser = true;
-                    self.finish_the_game();
+                    let winner_name = self.get_enemy_name(&player_name);
+                    self.finish_the_game(Some(&winner_name));
                 }
-                PlayerColission::InBetween(snakes_colission, player_a, player_b) => {
+                PlayerColission::InBetween(snakes_colission, _loser, winner) => {
                     match snakes_colission {
                         SnakesColission::HeadToHeadColission => {
-                            self.players.get_mut(&player_a).unwrap().is_loser = true;
-                            self.players.get_mut(&player_b).unwrap().is_loser = true;
+                            self.finish_the_game(None);
                         }
                         SnakesColission::HeadToTailColission => {
-                            self.players.get_mut(&player_a).unwrap().is_loser = true;
-                            self.players.get_mut(&player_b).unwrap().is_loser = false;
+                            self.finish_the_game(Some(&winner));
                         }
                     }
-                    self.finish_the_game();
                 }
             }
         }
     }
 
-    pub fn update(&mut self, update_fruit_pos: bool) {
-        match self.state {
+    pub fn reset(&mut self) {}
+
+    pub fn update(&mut self) {
+        match &self.state {
+            GameState::NotStarted => {
+                if self.players.iter().count() == 2
+                    && self.players.iter().all(|player| {
+                        return player.1.state == PlayerState::Ready;
+                    })
+                {
+                    self.state = GameState::Playing;
+                    self.start();
+                    return;
+                }
+            }
             GameState::Playing => {
                 if self.players.iter().any(|player| {
                     return player.1.state == PlayerState::NotReady;
@@ -231,7 +266,7 @@ impl GameCore {
                     snake.move_step_tick();
                 }
 
-                if update_fruit_pos && self.fruit_pos.is_none() {
+                if self.is_server && self.fruit_pos.is_none() {
                     self.update_fruit_pos();
                 }
             }
@@ -245,15 +280,16 @@ impl GameCore {
                     }
                 }
             }
-            GameState::Finished => {
+            GameState::Finished(_finish_details) => {
                 if self.players.len() < PLAYER_COUNT_MAX {
-                    self.state = GameState::Paused;
+                    self.state = GameState::NotStarted;
                     return;
                 }
 
                 if self.players.iter().all(|player| {
                     return player.1.state == PlayerState::Ready;
                 }) {
+                    self.start();
                     self.state = GameState::Playing;
                     return;
                 }

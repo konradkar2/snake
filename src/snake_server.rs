@@ -43,8 +43,7 @@ impl Server {
 
         {
             let mut game_guard = self.game_guard.lock().unwrap();
-            let player_count = game_guard.players.len();
-            game_guard.add_player(&nickname, from_color(PLAYER_COLORS[player_count]));
+            game_guard.add_player(&nickname);
         }
 
         self.player_comms.insert(nickname.to_string(), comms);
@@ -191,7 +190,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
         loop {
             {
                 let mut game = game_guard.lock().unwrap();
-                game.update(true);
+                game.update();
             }
 
             thread::sleep(time::Duration::from_secs_f64(TICK_RATE_TIME));
@@ -200,7 +199,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
 }
 
 fn main() -> Result<(), ()>{
-    let game_guard = Arc::new(Mutex::new(GameCore::new()));
+    let game_guard = Arc::new(Mutex::new(GameCore::new(true)));
 
     let mut server = Server {
         state: ServerState::WaitingForPlayers,
