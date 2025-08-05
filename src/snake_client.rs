@@ -1,5 +1,4 @@
 use std::{
-    any::Any,
     sync::{
         Mutex,
         mpsc::{Receiver, Sender},
@@ -17,11 +16,10 @@ pub mod snake_cfg;
 pub mod common;
 pub mod comms;
 pub mod ifc;
+pub mod fsm;
 
 use crate::comms::*;
-use std::io;
 
-use bincode::config;
 use ifc::Message;
 use macroquad::prelude as mcq;
 

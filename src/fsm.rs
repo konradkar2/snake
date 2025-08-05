@@ -1,14 +1,15 @@
 
 use std::fmt::Debug;
 use std::rc::Rc;
-
+use serde::{Serialize, Deserialize};
 pub trait FsmEvent: Debug {}
-pub trait FsmState<E: FsmEvent>: Debug {
+pub trait FsmState<E: FsmEvent>: Debug  {
     fn on_enter(self: &Self) {}
     fn on_exit(self: &Self) {}
     fn handle_event(self: &Self, event: &E) -> Option<Rc<dyn FsmState<E>>>;
 }
 
+#[derive(Debug)]
 pub struct StateMachine<E: FsmEvent> {
     state: Rc<dyn FsmState<E>>,
 }

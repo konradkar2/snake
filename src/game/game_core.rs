@@ -9,18 +9,18 @@ use rand::{Rng, rng};
 
 use crate::snake::{Direction, Snake};
 
-use bincode::{Decode, Encode};
+use serde::{Serialize, Deserialize};
 
 use super::snake::SnakesColission;
 
-#[derive(Encode, Decode, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 
 pub struct FinishDetails {
     pub draw: bool,
     pub winner: String,
 }
 
-#[derive(Encode, Decode, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum GameState {
     NotStarted,
     Paused,
@@ -28,19 +28,19 @@ pub enum GameState {
     Finished(FinishDetails),
 }
 
-#[derive(Encode, Decode, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum PlayerState {
     NotReady,
     Ready,
 }
 
-#[derive(Encode, Decode, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Player {
     pub name: String,
     pub state: PlayerState,
 }
 
-#[derive(Encode, Decode, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GameCore {
     pub state: GameState,
     pub players: BTreeMap<String, Player>,

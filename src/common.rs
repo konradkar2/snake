@@ -1,8 +1,8 @@
 use macroquad::prelude::{Color, Vec2};
 
-use bincode::{Decode, Encode};
+use serde::{Serialize, Deserialize};
 
-#[derive(Decode, Encode, Clone, Copy, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub struct MyVec2 {
     pub x: f32,
     pub y: f32,
@@ -26,7 +26,7 @@ pub fn to_vec2(v: MyVec2) -> Vec2 {
     Vec2 { x: v.x, y: v.y }
 }
 
-#[derive(Decode, Encode, Clone, Copy, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug)]
 pub struct MyColor {
     pub r: f32,
     pub g: f32,

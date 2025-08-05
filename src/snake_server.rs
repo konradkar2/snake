@@ -1,10 +1,6 @@
-use bincode::config;
-use common::from_color;
 use game::game_core::GameCore;
-use macroquad::color::{GREEN, PINK};
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Error;
 use std::net::{TcpListener, TcpStream};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -23,6 +19,7 @@ pub mod game;
 use crate::game::*;
 
 pub mod common;
+mod fsm;
 
 enum ServerState {
     WaitingForPlayers,

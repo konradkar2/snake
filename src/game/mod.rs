@@ -2,33 +2,12 @@ pub mod game_core;
 use crate::{game_core::*, snake_cfg::PLAYER_COUNT_MAX};
 use macroquad::{color::Color, prelude as mcq};
 pub mod snake;
-use crate::common::from_color;
+
 
 #[derive(Debug)]
 pub struct GameLocal {
     pub game_core: GameCore,
     player_name: String,
-}
-
-fn draw_text_center(text: &str, x: f32, y: f32, font_size: f32, color: mcq::Color) {
-    let text_dims = mcq::measure_text(text, None, font_size as u16, 1.0);
-    mcq::draw_text(
-        text,
-        x - text_dims.width / 2.0,
-        y + text_dims.height / 2.0 - text_dims.offset_y / 2.0,
-        100.0,
-        color,
-    );
-}
-
-fn draw_big_text(text: &str, color: mcq::Color) {
-    draw_text_center(
-        text,
-        mcq::screen_width() / 2.0,
-        mcq::screen_height() / 2.0,
-        50.0,
-        color,
-    );
 }
 
 impl GameLocal {

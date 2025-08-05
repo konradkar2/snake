@@ -1,15 +1,14 @@
 use std::{
-    array,
     io::{self, Read, Write},
     net::TcpStream,
 };
 
-use bincode::config;
+use postcard::{from_bytes, to_slice};
+use serde::ser;
 
-use crate::{ifc::Message, snake_cfg::SERVER_ADDRESS};
+use crate::ifc::Message;
 
 pub struct Comms {
-    pub bincode_cfg: bincode::config::Configuration,
     pub connection: Option<TcpStream>,
     recv_buffer: [u8; BUFF_SIZE],
     recv_buffer_pointer: usize,
@@ -67,7 +66,7 @@ fn get_last_message(buff: &[u8]) -> (Vec<u8>, Option<Vec<u8>>) {
         bytes_left -= PREFIX_SIZE;
 
         let frame_len = u32::from_be_bytes(prefix_buffer) as usize;
-    
+
         if frame_len > bytes_left {
             buffer_pointer -= PREFIX_SIZE;
             remainder = Some(buff[buffer_pointer..].to_vec());
@@ -85,7 +84,6 @@ fn get_last_message(buff: &[u8]) -> (Vec<u8>, Option<Vec<u8>>) {
 impl Comms {
     pub fn new(connection: Option<TcpStream>) -> Self {
         Self {
-            bincode_cfg: config::standard(),
             connection,
             recv_buffer: [0; BUFF_SIZE],
             recv_buffer_pointer: 0,
@@ -115,10 +113,15 @@ impl Comms {
             .expect("failed to set non blocking on a socket");
     }
 
-    pub fn receive_message(&mut self) -> Result<Message, CommError> {
+    //pub fn deserialize_message()
+
+    fn receive_message_raw(&mut self) -> Result<Vec<u8>, CommError> {
         let recv_buff = self.recv_buffer.as_mut_slice();
         let recv_buff_p = self.recv_buffer_pointer;
-        let read_size = read_into_buff(self.connection.as_mut().unwrap(), &mut recv_buff[recv_buff_p..])?;
+        let read_size = read_into_buff(
+            self.connection.as_mut().unwrap(),
+            &mut recv_buff[recv_buff_p..],
+        )?;
 
         let (last_msg, remainder) = get_last_message(&mut recv_buff[..recv_buff_p + read_size]);
 
@@ -135,35 +138,41 @@ impl Comms {
             self.recv_buffer_pointer = 0;
         }
 
-    
+        Ok(last_msg)
+    }
 
-        let (decoded, _): (Message, usize) =
-            bincode::decode_from_slice(last_msg.as_slice(), self.bincode_cfg).map_err(
-                |err| {
-                    eprintln!(
-                        "[ERROR] Failed to deserialize data (read size: {}): {}",
-                        last_msg.len(), err
-                    );
-                    CommError::Unknown
-                },
-            )?;
+    pub fn receive_message(&mut self) -> Result<Message, CommError> {
+        let raw_message = self.receive_message_raw()?;
 
-        Ok(decoded)
+        let deserialized: Message =
+            postcard::from_bytes(raw_message.as_slice()).map_err(|err| {
+                eprintln!(
+                    "[ERROR] Failed to deserialize data (read size: {}): {}",
+                    raw_message.len(),
+                    err
+                );
+                CommError::Unknown
+            })?;
+
+        Ok(deserialized)
+    }
+
+    fn serialize_message(message: &Message, buf: &mut [u8]) -> Result<u32, CommError> {
+        let serialized = postcard::to_slice(message, buf).map_err(|err| {
+            eprintln!("[ERROR] failed to serialize data: {}", err);
+            CommError::InvalidData
+        })?;
+
+        Ok(serialized.len() as u32)
     }
 
     pub fn send_message(&mut self, message: &Message) -> Result<(), CommError> {
         let mut buffer: [u8; BUFF_SIZE] = [0; BUFF_SIZE];
 
-        let serialize_len =
-            bincode::encode_into_slice(message, &mut buffer[4..BUFF_SIZE], self.bincode_cfg)
-                .map_err(|err| {
-                    eprintln!("[ERROR] failed to serialize data: {}", err);
-                    CommError::InvalidData
-                })? as u32;
+        let serialized_len = Self::serialize_message(message, &mut buffer[4..BUFF_SIZE])?;
+        buffer[0..4].copy_from_slice(&serialized_len.to_be_bytes());
 
-        buffer[0..4].copy_from_slice(&serialize_len.to_be_bytes());
-
-        let total_len: usize = serialize_len as usize + 4;
+        let total_len: usize = serialized_len as usize + 4;
 
         self.connection
             .as_ref()

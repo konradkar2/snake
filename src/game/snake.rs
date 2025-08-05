@@ -3,11 +3,11 @@ use crate::{
     common::to_color,
     snake_cfg::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE},
 };
-use bincode::{Decode, Encode};
+use serde::{Serialize, Deserialize};
 use macroquad::prelude::draw_rectangle;
-use rand::{Rng, rng};
 
-#[derive(Decode, Encode, Debug, Clone)]
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) enum Direction {
     Up,
     Down,
@@ -15,12 +15,12 @@ pub(crate) enum Direction {
     Right,
 }
 
-pub(crate) enum SnakesColission {
+pub enum SnakesColission {
     HeadToTailColission,
     HeadToHeadColission,
 }
 
-#[derive(Decode, Encode, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct Snake {
     positions: Vec<MyVec2>,
     previous_tail_position: MyVec2,

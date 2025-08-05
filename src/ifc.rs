@@ -1,16 +1,10 @@
 use std::array;
 
-use bincode::{Decode, Encode};
+use serde::{Serialize, Deserialize};
 
 use crate::game::game_core::GameCore;
 
-#[derive(Decode, Encode, Debug)]
-struct Padding
-{
-    pad: [i8; 1024],
-}
-
-#[derive(Decode, Encode, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum Message
 {
     JoinLobby(String),
