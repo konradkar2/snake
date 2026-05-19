@@ -3,9 +3,6 @@ use std::{
     net::TcpStream,
 };
 
-use postcard::{from_bytes, to_slice};
-use serde::ser;
-
 use crate::ifc::Message;
 
 pub struct Comms {
@@ -24,12 +21,6 @@ pub enum CommError {
     InvalidData,
     WouldBlock,
     WaitingForMoreData,
-}
-
-#[derive(Debug)]
-pub enum ClientError {
-    ConnectionError,
-    Unknown(String),
 }
 
 const BUFF_SIZE: usize = 4096;
@@ -89,6 +80,7 @@ impl Comms {
             recv_buffer_pointer: 0,
         }
     }
+    
     pub fn connect(&mut self, server_ip: &str) -> Result<(), io::Error> {
         let stream = TcpStream::connect(server_ip).inspect_err(|err| {
             eprintln!(

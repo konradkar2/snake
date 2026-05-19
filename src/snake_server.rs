@@ -19,7 +19,6 @@ pub mod game;
 use crate::game::*;
 
 pub mod common;
-mod fsm;
 
 enum ServerState {
     WaitingForPlayers,
@@ -65,7 +64,10 @@ impl Server {
 
         let mut resp: Message;
 
-        if let Message::JoinLobby(nickname) = msg {
+        if let Message::JoinLobby {
+            player_name: nickname,
+        } = msg
+        {
             resp = Message::Ok;
 
             let result = self.try_add_player(nickname.as_str(), comms_rc.clone());
@@ -73,12 +75,14 @@ impl Server {
             if result.is_err() {
                 let msg = format!("Player '{}' is already added", nickname.as_str());
                 eprintln!("[WARNING]: {}", msg);
-                resp = Message::Nok(msg);
+                resp = Message::Nok { error_msg: msg };
             } else {
                 comms_rc.borrow_mut().set_nonblocking();
             }
         } else {
-            resp = Message::Nok("Invalid message, expected join lobby".to_string());
+            resp = Message::Nok {
+                error_msg: "Invalid message, expected join lobby".to_string(),
+            };
         }
 
         comms_rc.borrow_mut().send_message(&resp)
@@ -140,11 +144,14 @@ impl Server {
 
     fn main_loop(&mut self) -> io::Result<()> {
         let listener = TcpListener::bind(SERVER_ADDRESS).inspect_err(|err| {
-            eprintln!("[ERROR]: failed to bind to address {}: {}", SERVER_ADDRESS, err)
+            eprintln!(
+                "[ERROR]: failed to bind to address {}: {}",
+                SERVER_ADDRESS, err
+            )
         })?;
 
         listener.set_nonblocking(true).inspect_err(|err| {
-            eprintln!("[ERROR]: failed to set nonblocking on socket");
+            eprintln!("[ERROR]: failed to set nonblocking on socket {}", err);
         })?;
 
         println!("[INFO]: Listening for connection at {}...", SERVER_ADDRESS);
@@ -198,7 +205,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
     });
 }
 
-fn main() -> Result<(), ()>{
+fn main() -> Result<(), ()> {
     let game_guard = Arc::new(Mutex::new(GameCore::new(true)));
 
     let mut server = Server {

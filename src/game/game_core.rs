@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::{
-    common::{MyColor, MyVec2, from_color},
+    common::{MyVec2, from_color},
     snake_cfg::*,
 };
 use macroquad::prelude as mcq;
