@@ -15,7 +15,6 @@ pub const SNAKE_TICKS_PER_MOVE: f32 = 20.0;
 pub const SCREEN_WIDTH: f32 = 800.0;
 pub const SCREEN_HEIGHT: f32 = 600.0;
 
-pub const DEFAULT_NICKNAME: &'static str = "player";
 pub const SERVER_ADDRESS: &'static str = "0.0.0.0:6969";
 
 pub const PLAYER_COUNT_MAX: usize = 2;

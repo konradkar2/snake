@@ -80,7 +80,7 @@ impl Comms {
             recv_buffer_pointer: 0,
         }
     }
-    
+
     pub fn connect(&mut self, server_ip: &str) -> Result<(), io::Error> {
         let stream = TcpStream::connect(server_ip).inspect_err(|err| {
             eprintln!(
@@ -104,8 +104,6 @@ impl Comms {
             .set_nonblocking(true)
             .expect("failed to set non blocking on a socket");
     }
-
-    //pub fn deserialize_message()
 
     fn receive_message_raw(&mut self) -> Result<Vec<u8>, CommError> {
         let recv_buff = self.recv_buffer.as_mut_slice();
@@ -164,7 +162,7 @@ impl Comms {
         let serialized_len = Self::serialize_message(message, &mut buffer[4..BUFF_SIZE])?;
         buffer[0..4].copy_from_slice(&serialized_len.to_be_bytes());
 
-        let total_len: usize = serialized_len as usize + 4;
+        let total_len = serialized_len as usize + 4;
 
         self.connection
             .as_ref()
@@ -179,8 +177,6 @@ impl Comms {
                 }
             })?;
 
-        // println!("written bytes: {}", total_len);
-
-        Ok(())
+            Ok(())
     }
 }

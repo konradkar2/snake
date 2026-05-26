@@ -28,30 +28,31 @@ impl ClientSettings {
 
 pub struct ClientComms {
     comms: Comms,
-    client_settings: ClientSettings,
+    settings: ClientSettings,
     update_count: usize,
 }
 
 impl ClientComms {
-    pub fn new(comms: Comms, client_settings: ClientSettings) -> Self {
+    pub fn new(client_settings: ClientSettings) -> Self {
         Self {
-            comms: comms,
-            client_settings: client_settings,
+            comms: Comms::new(None),
+            settings: client_settings,
             update_count: 0,
         }
     }
 
     pub fn connect(&mut self) -> Result<(), ClientError> {
         self.comms
-            .connect(&self.client_settings.server_ip)
+            .connect(&self.settings.server_ip)
             .map_err(|_| ClientError::ConnectionError)
     }
 
     pub fn join_server(&mut self) -> Result<(), ClientError> {
         let register_msg = Message::JoinLobby {
-            player_name: self.client_settings.nickname.clone(),
+            player_name: self.settings.nickname.clone(),
         };
-        self.comms.send_message(&register_msg).unwrap();
+        self.comms.send_message(&register_msg).map_err(|_| ClientError::ConnectionError)?;
+
         let response = self
             .comms
             .receive_message()
@@ -63,7 +64,7 @@ impl ClientComms {
                 eprintln!("[ERROR]: Failed to join lobby: {}", msg);
                 Err(ClientError::Unknown("".to_string()))
             }
-            _ => Err(ClientError::Unknown("".to_string())),
+            _ => Err(ClientError::Unknown("Unexpected message received".to_string())),
         }?;
 
         Ok(())

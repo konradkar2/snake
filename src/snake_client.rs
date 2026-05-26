@@ -33,17 +33,21 @@ fn setup_screen() {
     mcq::next_frame();
 }
 
-fn parse_args() -> ClientSettings {
+fn print_help() {
+    println!("<nickname> <server IP address:port>\n");
+}
+
+fn parse_args() -> Option<ClientSettings> {
     let mut args = env::args();
     args.next().expect("executable name");
 
-    let nickname: String = args.next().unwrap_or(DEFAULT_NICKNAME.to_string());
-    let ip: String = args.next().expect("Please provide ip");
+    let nickname: String = args.next()?;
+    let ip: String = args.next()?;
 
-    ClientSettings {
+    Some(ClientSettings {
         nickname: nickname,
         server_ip: ip,
-    }
+    })
 }
 
 async fn run_drawing(game_lock: Arc<Mutex<GameLocal>>, input_tx: Sender<char>) {
@@ -66,44 +70,32 @@ async fn run_drawing(game_lock: Arc<Mutex<GameLocal>>, input_tx: Sender<char>) {
     }
 }
 
-#[macroquad::main("Snake")]
-async fn main() -> Result<(), ()> {
-    let client_settings: ClientSettings = parse_args();
-    client_settings.print();
-
-    setup_screen();
-
-    let game_lock = Arc::new(Mutex::new(GameLocal::new(&client_settings.nickname)));
-
-    {
-        let game = game_lock.lock().unwrap();
-        println!("gameLocal: {:?}", game);
-    }
-
-    let game_lock_comms = Arc::clone(&game_lock);
-
-    let (tx, rx): (Sender<char>, Receiver<char>) = channel();
+fn run_connection_thread(
+    game_lock: Arc<Mutex<GameLocal>>,
+    mut client_comms: ClientComms,
+    input_rx: Receiver<char>,
+) {
     thread::spawn(move || {
-        let mut client = ClientComms::new(Comms::new(None), client_settings);
-
-        client.connect().expect("failed to connect to the server");
-        client.join_server().expect("failed to join the server");
+        client_comms
+            .connect()
+            .expect("failed to connect to the server");
+        client_comms
+            .join_server()
+            .expect("failed to join the server");
 
         loop {
-            {
-                if let Ok(c) = rx.try_recv() {
-                    {
-                        let mut game = game_lock_comms.lock().unwrap();
-                        game.handle_input(c);
-                    }
-                    client.send_input(c).unwrap();
+            if let Ok(c) = input_rx.try_recv() {
+                {
+                    let mut game = game_lock.lock().unwrap();
+                    game.handle_input(c);
                 }
+                client_comms.send_input(c).unwrap();
             }
 
-            match client.receive_game_update() {
+            match client_comms.receive_game_update() {
                 Ok(game_update) => {
                     if let Some(new_game_state) = game_update {
-                        let mut game = game_lock_comms.lock().unwrap();
+                        let mut game = game_lock.lock().unwrap();
                         game.game_core = new_game_state;
                     }
                 }
@@ -115,19 +107,43 @@ async fn main() -> Result<(), ()> {
             thread::sleep(time::Duration::from_secs_f64(TICK_RATE_TIME));
         }
     });
+}
 
-    let game_lock_update = Arc::clone(&game_lock);
+fn run_game_logic_thread(game_lock: Arc<Mutex<GameLocal>>) {
     thread::spawn(move || {
         loop {
             {
-                let mut game = game_lock_update.lock().unwrap();
+                let mut game = game_lock.lock().unwrap();
                 game.update();
             }
             thread::sleep(time::Duration::from_secs_f64(TICK_RATE_TIME));
         }
     });
+}
 
-    run_drawing(game_lock, tx).await;
+#[macroquad::main("Snake")]
+async fn main() -> Result<(), ()> {
+    let client_settings = match parse_args() {
+        Some(cs) => cs,
+        None => {
+            print_help();
+            return Err(());
+        }
+    };
+
+    client_settings.print();
+    setup_screen();
+
+    let game_lock = Arc::new(Mutex::new(GameLocal::new(&client_settings.nickname)));
+
+    let (input_tx, input_rx): (Sender<char>, Receiver<char>) = channel();
+    run_connection_thread(
+        game_lock.clone(),
+        ClientComms::new(client_settings),
+        input_rx,
+    );
+    run_game_logic_thread(game_lock.clone());
+    run_drawing(game_lock, input_tx).await;
 
     Ok(())
 }
