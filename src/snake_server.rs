@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::net::{TcpListener, TcpStream};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::{io, thread, time};
+use std::{env, io, thread, time};
 pub mod ifc;
 use crate::ifc::*;
 pub mod snake_cfg;
@@ -23,6 +23,21 @@ struct Server {
     state: ServerState,
     game_guard: Arc<Mutex<GameCore>>,
     player_comms: HashMap<String, Rc<RefCell<Comms>>>,
+}
+
+struct ServerSettings {
+    ip: String
+}
+
+fn parse_args() -> ServerSettings {
+    let mut args = env::args();
+    args.next().expect("executable name");
+
+   let ip: String = args.next().unwrap_or(SERVER_ADDRESS.to_string());
+
+    ServerSettings {
+        ip
+    }
 }
 
 impl Server {
@@ -132,10 +147,11 @@ impl Server {
     }
 
     fn main_loop(&mut self) -> io::Result<()> {
-        let listener = TcpListener::bind(SERVER_ADDRESS).inspect_err(|err| {
+        let settings = parse_args();
+        let listener = TcpListener::bind(&settings.ip).inspect_err(|err| {
             eprintln!(
                 "[ERROR]: failed to bind to address {}: {}",
-                SERVER_ADDRESS, err
+                settings.ip, err
             )
         })?;
 
@@ -143,7 +159,7 @@ impl Server {
             eprintln!("[ERROR]: failed to set nonblocking on socket {}", err);
         })?;
 
-        println!("[INFO]: Listening for connection at {}...", SERVER_ADDRESS);
+        println!("[INFO]: Listening for connection at {}...", settings.ip);
 
         loop {
             self.send_update();
@@ -194,7 +210,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
     });
 }
 
-fn main() -> Result<(), ()> {
+fn main() -> io::Result<()> {
     let game_guard = Arc::new(Mutex::new(GameCore::new_server()));
 
     let mut server = Server {
@@ -205,7 +221,6 @@ fn main() -> Result<(), ()> {
 
     launch_game_update_thread(game_guard.clone());
 
-    server.main_loop().map_err(|_err| {
-        eprintln!("[ERROR]: failed to start main loop");
-    })
+    server.main_loop()?;
+    Ok(())
 }
