@@ -7,11 +7,11 @@ use crate::{
 use macroquad::prelude as mcq;
 use rand::{Rng, rng};
 
-use crate::snake::{Direction, Snake};
+use super::snake::{Direction, Snake};
 
 use serde::{Serialize, Deserialize};
 
-use super::snake::SnakesColission;
+use super::snake::SnakeCollision;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 
@@ -32,21 +32,6 @@ pub enum GameState {
 pub enum PlayerState {
     NotReady,
     Ready,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Player {
-    pub name: String,
-    pub state: PlayerState,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GameCore {
-    pub state: GameState,
-    pub players: BTreeMap<String, Player>,
-    snakes: BTreeMap<String, Snake>,
-    pub fruit_pos: Option<MyVec2>,
-    is_server: bool,
 }
 
 const ENTER: char = '\x0D';
@@ -70,14 +55,36 @@ fn align_to_snake_size(pos: f32) -> u32 {
     pos - remainder
 }
 
-pub enum PlayerColission {
+pub(crate) enum PlayerColission {
     SelfColission(String),
-    InBetween(SnakesColission, String, String),
+    InBetween(SnakeCollision, String, String),
     FruitColission(String),
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Player {
+    pub name: String,
+    pub state: PlayerState,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GameSnapshot {
+    pub state: GameState,
+    pub players: BTreeMap<String, Player>,
+    pub snakes: BTreeMap<String, Snake>,
+    pub fruit_pos: Option<MyVec2>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GameCore {
+    pub state: GameState,
+    pub players: BTreeMap<String, Player>,
+    snakes: BTreeMap<String, Snake>,
+    pub fruit_pos: Option<MyVec2>,
+    is_server: bool,
 }
 
 impl GameCore {
-    pub fn new(is_server: bool) -> Self {
+    fn new(is_server: bool) -> Self {
         Self {
             state: GameState::NotStarted,
             snakes: BTreeMap::new(),
@@ -85,6 +92,30 @@ impl GameCore {
             fruit_pos: None,
             is_server,
         }
+    }
+
+    pub fn new_client() -> Self {
+        Self::new(false)
+    }
+
+    pub fn new_server() -> Self {
+        Self::new(true)
+    }
+
+    pub fn to_snapshot(&self) -> GameSnapshot {
+        GameSnapshot {
+            state: self.state.clone(),
+            players: self.players.clone(),
+            snakes: self.snakes.clone(),
+            fruit_pos: self.fruit_pos.clone(),
+        }
+    }
+
+    pub fn apply_snapshot(&mut self, snapshot: GameSnapshot) {
+        self.state = snapshot.state;
+        self.players = snapshot.players;
+        self.snakes = snapshot.snakes;
+        self.fruit_pos = snapshot.fruit_pos;
     }
 
     pub fn start(&mut self) {
@@ -156,7 +187,7 @@ impl GameCore {
         self.fruit_pos = Some(new_fruit_pos);
     }
 
-    pub fn get_colissions(&self) -> Option<PlayerColission> {
+    pub(crate) fn get_colissions(&self) -> Option<PlayerColission> {
         for (player_name, snake) in self.snakes.iter() {
             if snake.collides_self() {
                 return Some(PlayerColission::SelfColission(player_name.clone()));
@@ -230,10 +261,10 @@ impl GameCore {
                 }
                 PlayerColission::InBetween(snakes_colission, _loser, winner) => {
                     match snakes_colission {
-                        SnakesColission::HeadToHeadColission => {
+                        SnakeCollision::HeadToHead => {
                             self.finish_the_game(None);
                         }
-                        SnakesColission::HeadToTailColission => {
+                        SnakeCollision::HeadToTail => {
                             self.finish_the_game(Some(&winner));
                         }
                     }

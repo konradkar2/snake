@@ -1,6 +1,6 @@
 use crate::Comms;
 use crate::comms::CommError;
-use crate::game::game_core::GameCore;
+use crate::game::game_core::GameSnapshot;
 use crate::ifc::*;
 use crate::snake_cfg::*;
 
@@ -78,7 +78,7 @@ impl ClientComms {
         })
     }
 
-    pub fn receive_game_update(&mut self) -> Result<Option<GameCore>, ClientError> {
+    pub fn receive_game_update(&mut self) -> Result<Option<GameSnapshot>, ClientError> {
         let response = self.comms.receive_message();
         match response {
             Ok(response) => {

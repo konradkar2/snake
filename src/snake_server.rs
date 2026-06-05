@@ -5,20 +5,14 @@ use std::net::{TcpListener, TcpStream};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::{io, thread, time};
-
 pub mod ifc;
 use crate::ifc::*;
-
 pub mod snake_cfg;
 use crate::snake_cfg::*;
-
 pub mod comms;
 use crate::comms::*;
-
-pub mod game;
-use crate::game::*;
-
 pub mod common;
+pub mod game;
 
 enum ServerState {
     WaitingForPlayers,
@@ -55,6 +49,12 @@ impl Server {
         game_guard.remove_player(nickname);
     }
 
+    fn remove_disconnected_players(&mut self, disconnected_players: Vec<String>) {
+        for player in disconnected_players {
+            self.remove_player(player.as_str());
+        }
+    }
+
     fn handle_connection(&mut self, stream: TcpStream) -> Result<(), CommError> {
         println!("[SERVER]: client connecting {:?}...", stream.peer_addr());
         let comms_rc = Rc::new(RefCell::new(Comms::new(Some(stream))));
@@ -62,36 +62,31 @@ impl Server {
         let msg: Message = comms_rc.borrow_mut().receive_message()?;
         println!("[SERVER]: got msg: {:?}", msg);
 
-        let mut resp: Message;
-
-        if let Message::JoinLobby {
-            player_name: nickname,
-        } = msg
-        {
-            resp = Message::Ok;
-
-            let result = self.try_add_player(nickname.as_str(), comms_rc.clone());
-
-            if result.is_err() {
-                let msg = format!("Player '{}' is already added", nickname.as_str());
-                eprintln!("[WARNING]: {}", msg);
-                resp = Message::Nok { error_msg: msg };
-            } else {
-                comms_rc.borrow_mut().set_nonblocking();
-            }
-        } else {
-            resp = Message::Nok {
-                error_msg: "Invalid message, expected join lobby".to_string(),
-            };
-        }
+        let resp = match msg {
+            Message::JoinLobby {
+                player_name: nickname,
+            } => match self.try_add_player(nickname.as_str(), comms_rc.clone()) {
+                Ok(()) => {
+                    comms_rc.borrow_mut().set_nonblocking();
+                    Message::Ok
+                }
+                Err(error_msg) => {
+                    eprintln!("[WARNING]: {}", error_msg);
+                    Message::Nok { error_msg }
+                }
+            },
+            _ => Message::Nok {
+                error_msg: ("Invalid message received".to_string()),
+            },
+        };
 
         comms_rc.borrow_mut().send_message(&resp)
     }
 
     fn send_update(&mut self) {
-        let game_copy: GameCore = {
+        let game_update = {
             let game_guard = self.game_guard.lock().unwrap();
-            game_guard.clone()
+            Message::GameUpdate(game_guard.to_snapshot())
         };
 
         let mut disconnected_players: Vec<String> = Vec::new();
@@ -99,18 +94,15 @@ impl Server {
         for (player_name, player_rc) in &self.player_comms {
             let _ = player_rc
                 .borrow_mut()
-                .send_message(&Message::GameUpdate(game_copy.clone()))
-                .inspect_err(|err| match err {
-                    CommError::WouldBlock => {}
-                    _ => {
+                .send_message(&game_update)
+                .inspect_err(|err| {
+                    if err.is_disconnected() {
                         disconnected_players.push(player_name.clone());
                     }
                 });
         }
 
-        for player in disconnected_players {
-            self.remove_player(player.as_str());
-        }
+        self.remove_disconnected_players(disconnected_players);
     }
 
     fn receive_messages(&mut self) {
@@ -128,18 +120,15 @@ impl Server {
                         eprintln!("[ERROR] unexpected message received");
                     }
                 },
-                Err(e) => match e {
-                    CommError::WouldBlock => {}
-                    _ => {
+                Err(err) => {
+                    if err.is_disconnected() {
                         disconnected_players.push(player_name.clone());
                     }
-                },
+                }
             }
         }
 
-        for player in disconnected_players {
-            self.remove_player(player.as_str());
-        }
+        self.remove_disconnected_players(disconnected_players);
     }
 
     fn main_loop(&mut self) -> io::Result<()> {
@@ -206,7 +195,7 @@ fn launch_game_update_thread(game_guard: Arc<Mutex<GameCore>>) {
 }
 
 fn main() -> Result<(), ()> {
-    let game_guard = Arc::new(Mutex::new(GameCore::new(true)));
+    let game_guard = Arc::new(Mutex::new(GameCore::new_server()));
 
     let mut server = Server {
         state: ServerState::WaitingForPlayers,

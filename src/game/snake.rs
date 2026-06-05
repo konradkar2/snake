@@ -1,13 +1,10 @@
-use crate::common::{MyColor, MyVec2};
-use crate::{
-    common::to_color,
-    snake_cfg::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE},
-};
-use serde::{Serialize, Deserialize};
 use macroquad::prelude::draw_rectangle;
+use serde::{Deserialize, Serialize};
 
+use crate::common::{to_color, MyColor, MyVec2};
+use crate::snake_cfg::{SCREEN_HEIGHT, SCREEN_WIDTH, SNAKE_SIZE, SNAKE_TICKS_PER_MOVE};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Direction {
     Up,
     Down,
@@ -15,13 +12,13 @@ pub(crate) enum Direction {
     Right,
 }
 
-pub enum SnakesColission {
-    HeadToTailColission,
-    HeadToHeadColission,
+pub(crate) enum SnakeCollision {
+    HeadToTail,
+    HeadToHead,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub(crate) struct Snake {
+pub struct Snake {
     positions: Vec<MyVec2>,
     previous_tail_position: MyVec2,
     direction: Direction,
@@ -37,7 +34,7 @@ impl Snake {
             direction: Direction::Left,
             previous_tail_position: last_tail_pos,
             positions: Vec::from([last_tail_pos]),
-            color: color,
+            color,
             update_counter: 0,
         };
 
@@ -52,7 +49,7 @@ impl Snake {
     }
 
     fn get_tail(&self) -> &[MyVec2] {
-        return &self.positions[1..];
+        &self.positions[1..]
     }
 
     fn move_step(&mut self) {
@@ -100,6 +97,12 @@ impl Snake {
         self.positions.push(self.previous_tail_position);
     }
 
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn get_direction(&self) -> Direction {
+        self.direction
+    }
+
     pub(crate) fn draw(&self) {
         for pos in &self.positions {
             draw_rectangle(pos.x, pos.y, SNAKE_SIZE, SNAKE_SIZE, to_color(self.color));
@@ -120,7 +123,7 @@ impl Snake {
     }
 
     fn collides_head(&self, object: &MyVec2) -> bool {
-        return self.get_head_pos() == *object;
+        self.get_head_pos() == *object
     }
 
     fn collides_tail(&self, object: &MyVec2) -> bool {
@@ -137,15 +140,15 @@ impl Snake {
         self.collides_tail(&head_pos)
     }
 
-    pub(crate) fn collides_other(&self, other: &Snake) -> Option<SnakesColission> {
+    pub(crate) fn collides_other(&self, other: &Snake) -> Option<SnakeCollision> {
         let head_pos = self.get_head_pos();
 
         if other.collides_head(&head_pos) {
-            return Some(SnakesColission::HeadToHeadColission);
+            return Some(SnakeCollision::HeadToHead);
         }
 
         if other.collides_tail(&head_pos) {
-            return Some(SnakesColission::HeadToTailColission);
+            return Some(SnakeCollision::HeadToTail);
         }
 
         None

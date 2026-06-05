@@ -1,7 +1,8 @@
 pub mod game_core;
-use crate::{game_core::*, snake_cfg::PLAYER_COUNT_MAX};
-use macroquad::{color::Color, prelude as mcq};
 pub mod snake;
+use self::game_core::*;
+use crate::snake_cfg::PLAYER_COUNT_MAX;
+use macroquad::{color::Color, prelude as mcq};
 
 
 #[derive(Debug)]
@@ -12,7 +13,7 @@ pub struct GameLocal {
 
 impl GameLocal {
     pub fn new(player_name: &str) -> Self {
-        let mut game_core = GameCore::new(false);
+        let mut game_core = GameCore::new_client();
         game_core.add_player(player_name);
 
         Self {

@@ -23,6 +23,12 @@ pub enum CommError {
     WaitingForMoreData,
 }
 
+impl CommError {
+    pub fn is_disconnected(&self) -> bool {
+        !matches!(self, Self::WouldBlock | Self::WaitingForMoreData)
+    }
+}
+
 const BUFF_SIZE: usize = 4096;
 const PREFIX_SIZE: usize = 4;
 

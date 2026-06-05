@@ -94,9 +94,9 @@ fn run_connection_thread(
 
             match client_comms.receive_game_update() {
                 Ok(game_update) => {
-                    if let Some(new_game_state) = game_update {
+                    if let Some(snapshot) = game_update {
                         let mut game = game_lock.lock().unwrap();
-                        game.game_core = new_game_state;
+                        game.game_core.apply_snapshot(snapshot);
                     }
                 }
                 Err(err) => {
